@@ -1,0 +1,23 @@
+# Metrics built from other metrics. Simple metrics sit on the model they
+# aggregate, in models/marts/_marts.yml.
+
+metrics:
+  - name: average_order_value
+    label: Average order value
+    description: Revenue divided by the number of orders.
+    type: ratio
+    numerator: revenue
+    denominator: order_count
+
+  # Uses the time spine. Ossie and Snowflake semantic views have no equivalent,
+  # so this metric is served by the dbt Semantic Layer only. The meta flag is a
+  # reviewed decision: the bridge refuses to export a lossy metric without it.
+  - name: revenue_mtd
+    label: Revenue, month to date
+    description: Running revenue, resetting at the start of each month.
+    type: cumulative
+    input_metric: revenue
+    grain_to_date: month
+    config:
+      meta:
+        dbt_only: true

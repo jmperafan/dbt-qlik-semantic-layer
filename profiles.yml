@@ -1,0 +1,20 @@
+# Two targets. `dev` runs the whole demo locally on DuckDB. `snowflake` is the
+# client's warehouse; credentials come from the environment, never from here.
+jaffle_shop:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: jaffle_shop.duckdb
+      threads: 4
+
+    snowflake:
+      type: snowflake
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
+      user: "{{ env_var('SNOWFLAKE_USER') }}"
+      authenticator: "{{ env_var('SNOWFLAKE_AUTHENTICATOR', 'externalbrowser') }}"
+      role: "{{ env_var('SNOWFLAKE_ROLE', 'TRANSFORMER') }}"
+      warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE', 'TRANSFORMING') }}"
+      database: "{{ env_var('SNOWFLAKE_DATABASE', 'ANALYTICS') }}"
+      schema: "{{ env_var('SNOWFLAKE_SCHEMA', 'jaffle_shop') }}"
+      threads: 4

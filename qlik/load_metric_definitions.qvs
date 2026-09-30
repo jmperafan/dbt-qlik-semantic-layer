@@ -1,0 +1,29 @@
+// Pull governed metric definitions from Snowflake and expose each mirrored
+// metric as a variable: m_revenue, m_order_count, m_average_order_value...
+// Master items and charts use $(m_revenue) instead of a hand-typed Sum(amount).
+// Ratios reference other variables, which Qlik expands at calculation time.
+// Expressions use the dbt column names (amount, order_id), so the app's data
+// model must load those fields under the same names.
+
+// The only lines to change per environment: the connection and the table.
+SET vConnection = Snowflake;
+SET vMetricsTable = ANALYTICS.JAFFLE_SHOP.QLIK_METRIC_DEFINITIONS;
+
+LIB CONNECT TO '$(vConnection)';
+
+MetricDefinitions:
+LOAD METRIC_NAME AS metric_name, QLIK_EXPRESSION AS qlik_expression;
+SQL SELECT metric_name, qlik_expression
+FROM $(vMetricsTable)
+WHERE sync_status = 'mirrored';
+
+FOR i = 0 TO NoOfRows('MetricDefinitions') - 1
+    LET vName = 'm_' & Peek('metric_name', $(i), 'MetricDefinitions');
+    LET $(vName) = Peek('qlik_expression', $(i), 'MetricDefinitions');
+NEXT i
+
+DROP TABLE MetricDefinitions;
+LET vName = Null();
+LET i = Null();
+LET vConnection = Null();
+LET vMetricsTable = Null();

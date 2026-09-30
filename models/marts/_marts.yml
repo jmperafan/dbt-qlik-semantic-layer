@@ -1,0 +1,116 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# The semantic layer. This YAML is the only place metric logic lives.
+#
+#   semantic_model / entity / dimension / metrics  ->  MetricFlow (dbt SL, dbt MCP)
+#   config.meta.snowflake                          ->  Cortex-only extras, merged
+#                                                      into the Ossie document by
+#                                                      scripts/semantic_bridge.py
+#
+# The meta block never holds a formula. If it did, we'd have two definitions.
+# ──────────────────────────────────────────────────────────────────────────────
+
+models:
+  - name: orders
+    description: One row per order, including returned orders.
+    config:
+      meta:
+        snowflake:
+          synonyms: [sales, purchases, transactions]
+          instructions: Returned orders are included unless a metric says otherwise.
+    semantic_model:
+      enabled: true
+      name: orders
+    agg_time_dimension: ordered_at
+    columns:
+      - name: order_id
+        description: Primary key.
+        data_tests: [unique, not_null]
+        entity:
+          type: primary
+          name: order
+      - name: customer_id
+        description: The customer who placed the order.
+        entity:
+          type: foreign
+          name: customer
+      - name: ordered_at
+        description: Date the order was placed.
+        granularity: day
+        dimension:
+          type: time
+          label: Order date
+      - name: status
+        description: completed or returned.
+        dimension:
+          type: categorical
+          label: Order status
+      - name: completed_amount
+        description: The order amount if completed, otherwise 0.
+    metrics:
+      - name: revenue
+        label: Revenue
+        description: Sum of order amounts, returned orders included.
+        type: simple
+        agg: sum
+        expr: amount
+        config:
+          meta:
+            snowflake:
+              synonyms: [gross revenue, sales amount, turnover]
+      - name: order_count
+        label: Orders
+        description: Number of distinct orders.
+        type: simple
+        agg: count_distinct
+        expr: order_id
+      # A model column, not `filter:` and not a case expression in `expr`.
+      # Jinja filters ({{ Dimension('order__status') }}) don't survive the trip
+      # to Ossie, and a multi-column expression reaches Snowflake without table
+      # prefixes. A plain column translates cleanly everywhere, Qlik included.
+      - name: completed_revenue
+        label: Completed revenue
+        description: Revenue from completed orders only.
+        type: simple
+        agg: sum
+        expr: completed_amount
+        config:
+          meta:
+            snowflake:
+              synonyms: [net revenue]
+
+  - name: customers
+    description: One row per customer.
+    semantic_model:
+      enabled: true
+      name: customers
+    agg_time_dimension: signed_up_at
+    columns:
+      - name: customer_id
+        description: Primary key.
+        data_tests: [unique, not_null]
+        entity:
+          type: primary
+          name: customer
+      - name: region
+        description: Sales region the customer belongs to.
+        dimension:
+          type: categorical
+          label: Region
+        config:
+          meta:
+            snowflake:
+              synonyms: [area, territory]
+              instructions: Values are North, South and East.
+      - name: signed_up_at
+        description: Date the customer signed up.
+        granularity: day
+        dimension:
+          type: time
+          label: Signup date
+    metrics:
+      - name: new_customers
+        label: New customers
+        description: Customers who signed up in the period.
+        type: simple
+        agg: count_distinct
+        expr: customer_id

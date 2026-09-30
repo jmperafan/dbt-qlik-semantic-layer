@@ -1,0 +1,26 @@
+name: jaffle_shop
+profile: jaffle_shop
+
+require-dbt-version: [">=1.12.0", "<3.0.0"]  # v1.12 for native Ossie, v2 for everything else
+
+seeds:
+  jaffle_shop:
+    raw_orders:
+      +column_types:
+        amount: decimal(10, 2)
+
+models:
+  jaffle_shop:
+    +materialized: table
+
+vars:
+  # Flip to true once the semantic view is deployed to Snowflake, so the
+  # reconciliation test runs: dbt build --target snowflake --vars '{semantic_views_deployed: true}'
+  semantic_views_deployed: false
+
+  # Names that change per environment. The semantic view lives in
+  # <target database>.<semantic_schema>.<semantic_view>. See MIGRATION.md.
+  semantic_schema: semantic
+  semantic_view: jaffle_shop
+  metrics_reader_role: metrics_reader
+  mcp_warehouse: transforming

@@ -1,0 +1,9 @@
+customer_id,region,signed_up_at
+1,North,2026-01-04
+2,North,2026-01-12
+3,South,2026-01-20
+4,South,2026-02-03
+5,East,2026-02-15
+6,East,2026-03-01
+7,North,2026-03-09
+8,South,2026-03-22

@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "dbt": {
+      "command": "uvx",
+      "args": ["--env-file", "${DBT_PROJECT_DIR}/.env", "dbt-mcp"]
+    },
+    "snowflake": {
+      "type": "http",
+      "url": "https://${SNOWFLAKE_ACCOUNT_URL}/api/v2/databases/${SNOWFLAKE_DATABASE:-ANALYTICS}/schemas/${SEMANTIC_SCHEMA:-SEMANTIC}/mcp-servers/${SNOWFLAKE_MCP_SERVER:-JAFFLE_SHOP_MCP}",
+      "headers": {
+        "Authorization": "Bearer ${SNOWFLAKE_PAT}"
+      }
+    }
+  }
+}

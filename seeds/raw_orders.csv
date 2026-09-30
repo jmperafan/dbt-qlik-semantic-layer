@@ -1,0 +1,13 @@
+order_id,customer_id,ordered_at,status,amount
+101,1,2026-01-05,completed,24.50
+102,2,2026-01-14,completed,18.00
+103,1,2026-01-28,returned,32.00
+104,3,2026-02-02,completed,41.25
+105,4,2026-02-06,completed,12.75
+106,2,2026-02-19,completed,27.00
+107,5,2026-02-21,returned,15.50
+108,1,2026-03-03,completed,36.00
+109,6,2026-03-04,completed,22.00
+110,7,2026-03-12,completed,19.25
+111,3,2026-03-18,completed,44.00
+112,8,2026-03-25,completed,31.50
