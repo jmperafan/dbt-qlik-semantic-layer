@@ -9,7 +9,7 @@
 """
 MetricFlow YAML -> Apache Ossie -> Snowflake semantic view.
 
-  1. Gate:    every metric either translates cleanly or is marked dbt_only
+  1. Check:   every metric either translates cleanly or is marked dbt_only
   2. Convert: get an Ossie document from one of two sources (below)
   3. Check:   the document is one Snowflake can load without dropping anything
   4. Merge:   Cortex extras from config.meta.snowflake -> Ossie ai_context
@@ -29,8 +29,8 @@ Run after parsing against Snowflake, so dataset sources point at real tables:
   uv run scripts/semantic_bridge.py --schema ANALYTICS.SEMANTIC
   snow sql -f target/deploy_semantic_views.sql
 
-Exits non-zero on anything lossy, so CI can use it as the gate. `--check` runs
-the gate alone, with no dependencies beyond the standard library.
+Exits non-zero on anything lossy, so CI can use it as the check. `--check` runs
+the check alone, with no dependencies beyond the standard library.
 """
 
 from __future__ import annotations
@@ -88,7 +88,7 @@ def input_metrics(metric: dict) -> list[str]:
     return [ref["name"] for ref in [*refs, cumulative] if ref]
 
 
-def gate(semantic_manifest: dict) -> tuple[dict, set[str]]:
+def check_portability(semantic_manifest: dict) -> tuple[dict, set[str]]:
     """Drop metrics marked dbt_only; fail on any other lossy metric."""
     metrics = {m["name"]: m for m in semantic_manifest["metrics"]}
     dbt_only = {n for n, m in metrics.items() if ((m.get("config") or {}).get("meta") or {}).get("dbt_only")}
@@ -228,12 +228,12 @@ def main() -> None:
     parser.add_argument("--model-name", default="jaffle_shop", help="Name of the semantic view")
     parser.add_argument("--source", choices=["converter", "dbt-v1"], default="converter")
     parser.add_argument("--target-dir", type=Path, default=Path("target"))
-    parser.add_argument("--check", action="store_true", help="Run the portability gate only")
+    parser.add_argument("--check", action="store_true", help="Run the portability check only")
     args = parser.parse_args()
 
     try:
         semantic_manifest = json.loads((args.target_dir / "semantic_manifest.json").read_text())
-        portable, dbt_only = gate(semantic_manifest)
+        portable, dbt_only = check_portability(semantic_manifest)
         extras = collect_extras(portable, json.loads((args.target_dir / "manifest.json").read_text()))
         if args.check:
             print(f"OK: {len(portable['metrics'])} metrics portable to Snowflake")

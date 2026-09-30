@@ -1,8 +1,8 @@
 target/
 dbt_packages/
 logs/
-*.duckdb
 dbt_internal_packages/
 __pycache__/
 .user.yml
 .env
+_scratch/

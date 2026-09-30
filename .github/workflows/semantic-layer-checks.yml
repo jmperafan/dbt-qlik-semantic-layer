@@ -2,8 +2,13 @@
 #
 # No warehouse needed. dbt parse doesn't connect, and the bridge only reads
 # target/. Deploying to Snowflake stays a separate step with real credentials.
-# dbt v1.12 parses here because it writes osi_document.json natively; the
-# project itself can run on v2.
+#
+# The client runs dbt v2, so `checks` parses with v2 and takes the bridge's
+# default `--source converter` route (Apache converter on semantic_manifest.json,
+# rewrapped to Ossie 0.1.1) -- that's the path that actually ships. `cross-check`
+# additionally parses with dbt v1.12, which writes osi_document.json natively, and
+# runs `--source dbt-v1` purely to confirm the two independently-built converters
+# agree. It isn't required for this client and can be dropped if it gets noisy.
 
 name: semantic-layer-checks
 
@@ -23,11 +28,26 @@ jobs:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v10
 
-      - name: Parse with dbt v1.12, which also writes osi_document.json
-        run: uvx --from 'dbt-core>=1.12,<1.13' --with dbt-snowflake dbt parse --target snowflake
+      - name: Parse with dbt v2, the client's version
+        run: dbt parse --target snowflake
 
-      - name: Portability gate and the meta rule
+      - name: Portability check and the meta rule
         run: python3 scripts/semantic_bridge.py --check
 
       - name: Snowflake readiness (Ossie 0.1.1 schema, dialects, qualified columns)
+        run: uv run scripts/semantic_bridge.py --schema CI.SEMANTIC
+
+  cross-check:
+    runs-on: ubuntu-latest
+    env:
+      SNOWFLAKE_ACCOUNT: ci
+      SNOWFLAKE_USER: ci
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+
+      - name: Parse with dbt v1.12, which writes osi_document.json natively
+        run: uvx --from 'dbt-core>=1.12,<1.13' --with dbt-snowflake dbt parse --target snowflake
+
+      - name: Same Snowflake readiness check, via the native route
         run: uv run scripts/semantic_bridge.py --source dbt-v1 --schema CI.SEMANTIC

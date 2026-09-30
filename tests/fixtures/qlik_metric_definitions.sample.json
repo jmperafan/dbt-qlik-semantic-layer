@@ -1,0 +1,56 @@
+[
+  {
+    "metric_name": "revenue",
+    "label": "Revenue",
+    "description": "Sum of order amounts, returned orders included.",
+    "metric_type": "simple",
+    "qlik_expression": "Sum(amount)",
+    "sync_status": "mirrored",
+    "sync_note": null
+  },
+  {
+    "metric_name": "order_count",
+    "label": "Orders",
+    "description": "Number of distinct orders.",
+    "metric_type": "simple",
+    "qlik_expression": "Count(DISTINCT order_id)",
+    "sync_status": "mirrored",
+    "sync_note": null
+  },
+  {
+    "metric_name": "completed_revenue",
+    "label": "Completed revenue",
+    "description": "Revenue from completed orders only.",
+    "metric_type": "simple",
+    "qlik_expression": "Sum(completed_amount)",
+    "sync_status": "mirrored",
+    "sync_note": null
+  },
+  {
+    "metric_name": "average_order_value",
+    "label": "Average order value",
+    "description": "Revenue divided by the number of orders.",
+    "metric_type": "ratio",
+    "qlik_expression": "($(m_revenue)) / ($(m_order_count))",
+    "sync_status": "mirrored",
+    "sync_note": null
+  },
+  {
+    "metric_name": "new_customers",
+    "label": "New customers",
+    "description": "Customers who signed up in the period.",
+    "metric_type": "simple",
+    "qlik_expression": "Count(DISTINCT customer_id)",
+    "sync_status": "mirrored",
+    "sync_note": null
+  },
+  {
+    "metric_name": "revenue_mtd",
+    "label": "Revenue, month to date",
+    "description": "Running revenue, resetting at the start of each month.",
+    "metric_type": "cumulative",
+    "qlik_expression": null,
+    "sync_status": "not_mirrored",
+    "sync_note": "Cumulative metric: query it through the dbt Semantic Layer"
+  }
+]

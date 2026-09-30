@@ -12,11 +12,14 @@ what to rename, and the order to switch things on.
 | `macros/qlik.sql`, `macros/snowflake_mcp.sql` | `macros/` | No changes needed |
 | `models/qlik/` | `models/qlik/` | Reads your metrics from the project graph, so it needs no edits |
 | `scripts/semantic_bridge.py`, `scripts/ossie-0.1.1-schema.json` | `scripts/` | Keep the two files side by side |
+| `scripts/qlik_sync.py` | `scripts/` | Optional: automates the master-measure wiring in "6. Qlik" below. No changes needed |
 | `tests/reconcile_semantic_view.sql` | `tests/` | Rewrite the `reference` CTEs for your key metrics, independently of the YAML |
+| `tests/fixtures/qlik_metric_definitions.sample.json` | Not copied | Sample rows for testing `qlik_sync.py` against this sketch. Once you have a real `qlik_metric_definitions` table, export that instead |
 | `.github/workflows/semantic-layer-checks.yml` | `.github/workflows/` | Adjust the dummy credentials to your profile |
 | `CLAUDE.md` | Merge into your repo's `CLAUDE.md` | Update the file paths |
 | `claude/desktop_project_instructions.md` | The Claude Desktop project | Replace the example metric |
 | `.mcp.json`, `.env.example` | Repo root | `.env` stays out of git |
+| `.claude/skills/governed-metrics/`, `.claude/hooks/`, `.claude/settings.json` | `.claude/` | The guardrail layer: a skill for the conversational half, hooks for anything written to a file. No changes needed beyond the tool name if you rename `jaffle-shop-metrics` |
 | `qlik/load_metric_definitions.qvs` | The Qlik app's load script | Set the two variables at the top |
 | The `vars:` block in `dbt_project.yml` | Your `dbt_project.yml` | See the names below |
 
@@ -44,9 +47,9 @@ If you want the dbt v1.12 route for Ossie, also copy
 
 1. **Build in development.** `dbt build`, then look at `qlik_metric_definitions`.
    Every metric is either mirrored or says why not
-2. **Run the gate.** `python3 scripts/semantic_bridge.py --check`. Fix each
-   failure, or mark the metric `config.meta.dbt_only: true` as a reviewed
-   decision
+2. **Run the portability check.** `python3 scripts/semantic_bridge.py --check`.
+   Fix each failure, or mark the metric `config.meta.dbt_only: true` as a
+   reviewed decision
 3. **Path A, Starter or above:** the dbt Semantic Layer needs a production job
    that parses the project; `dbt build` does. Configure the Semantic Layer for
    that environment, then fill the Path A block of `.env` for dbt MCP
@@ -57,7 +60,10 @@ If you want the dbt v1.12 route for Ossie, also copy
    `--args '{oauth_integration: true}'` for Claude Desktop
 5. **Reconcile.** `dbt test --select tag:reconciliation --vars '{semantic_views_deployed: true}'`
 6. **Qlik.** Paste the load script, set the two variables, reload, and check
-   one chart using `$(m_average_order_value)`
+   one chart using `$(m_average_order_value)`. Wire each master measure to
+   its variable by hand once, or push them with
+   `uv run scripts/qlik_sync.py --definitions <export>.json` once you have a
+   Qlik Cloud tenant and API key
 7. **CI.** Add the workflow, and open a pull request that breaks a metric on
    purpose to see it fail
 8. **Claude.** Merge `CLAUDE.md`, add the Desktop connector and paste the
