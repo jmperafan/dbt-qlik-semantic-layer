@@ -21,6 +21,10 @@ import re
 import sys
 
 ALLOWED_PATH_PARTS = ("models/marts/", "models/metrics/", "macros/")
+# Anchored to a path boundary (start of string or after a "/"), not a bare
+# substring: "custom_models/marts/x.sql" contains "models/marts/" too, and
+# shouldn't count as the real models/marts/.
+ALLOWED_PATH_PATTERN = re.compile("(?:^|/)(?:" + "|".join(re.escape(p) for p in ALLOWED_PATH_PARTS) + ")")
 AGGREGATION_PATTERN = re.compile(r"\b(sum|count|avg|min|max|stddev|variance)\s*\(", re.IGNORECASE)
 
 
@@ -38,7 +42,7 @@ def main() -> None:
     if not file_path:
         sys.exit(0)
 
-    if file_path.endswith((".yml", ".yaml")) or any(part in file_path for part in ALLOWED_PATH_PARTS):
+    if file_path.endswith((".yml", ".yaml")) or ALLOWED_PATH_PATTERN.search(file_path):
         sys.exit(0)  # the semantic layer and its translation macros are the allowed home
 
     new_text = tool_input.get("content") or tool_input.get("new_string") or ""

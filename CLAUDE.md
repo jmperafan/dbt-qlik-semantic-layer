@@ -28,5 +28,5 @@ version:
 3. `dbt parse --target snowflake && uv run scripts/semantic_bridge.py --check`.
    If it fails, fix the metric or mark it `config.meta.dbt_only: true`
 4. To push the mirrored metrics to Qlik as master measures, see
-   `scripts/qlik_sync.py --check` (validates the definitions, no network) and
-   the "Automating Qlik master items" section in [README.md](README.md)
+   `qlik/sync.py --check` (validates the definitions, no network) and
+   [qlik/README.md](qlik/README.md)

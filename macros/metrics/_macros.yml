@@ -1,0 +1,77 @@
+version: 2
+
+macros:
+  - name: qlik_expression
+    description: |
+      Translates a MetricFlow metric into a Qlik expression, or returns an
+      empty string when it can't be mirrored safely. Only two shapes are
+      mirrored automatically:
+
+      - simple, unfiltered, on a bare column -> `Sum(amount)`, `Count(DISTINCT order_id)`
+      - a ratio of two metrics that are themselves mirrored -> `($(m_revenue)) / ($(m_order_count))`
+
+      Everything else (filtered metrics, cumulative/conversion/derived
+      metrics, an unsupported aggregation, an expression that isn't a plain
+      column) returns `''` so nobody assumes coverage that isn't there. Call
+      `qlik_not_mirrored_reason` to explain why a given metric came back
+      empty. Used by `models/qlik/qlik_metric_definitions.sql`.
+    arguments:
+      - name: metric
+        type: any
+        description: A metric node from `graph.metrics[...]`.
+
+  - name: qlik_not_mirrored_reason
+    description: |
+      The human-readable reason `qlik_expression` returned `''` for this
+      metric -- filtered, an unsupported aggregation, not a plain column, an
+      unmirrored ratio input, or (for cumulative/conversion/derived types)
+      a pointer to query it through the dbt Semantic Layer instead. Feeds
+      the `sync_note` column in `qlik_metric_definitions`.
+    arguments:
+      - name: metric
+        type: any
+        description: The same metric node passed to `qlik_expression`.
+
+  - name: sql_string
+    description: |
+      A SQL string literal for `value`: single-quoted with embedded quotes
+      doubled, or the bare word `null` when `value` is falsy. Used to build
+      `qlik_metric_definitions`' columns without hand-rolling escaping in
+      every call site.
+    arguments:
+      - name: value
+        type: string
+        description: The value to render as a SQL literal (or SQL `null`).
+
+  - name: deploy_mcp_server
+    description: |
+      Creates (or replaces) the Snowflake-managed MCP server over the
+      governed semantic view, plus the grants a `metrics_reader_role` user
+      needs to call it, and optionally an account-level OAuth security
+      integration for Claude Desktop's custom connector. Object names come
+      entirely from `dbt_project.yml`'s `semantic_schema`/`semantic_view`/
+      `metrics_reader_role`/`mcp_warehouse` vars -- nothing here is
+      Jaffle-Shop-specific.
+
+      Safe to re-run: `create or replace` means a spec change takes effect,
+      and the grants a replace drops are reapplied in the same call.
+
+      ```
+      dbt run-operation deploy_mcp_server --target snowflake
+      dbt run-operation deploy_mcp_server --args '{dry_run: true}'
+      dbt run-operation deploy_mcp_server --args '{oauth_integration: true}'
+      ```
+    arguments:
+      - name: dry_run
+        type: boolean
+        description: >
+          Default false. When true, logs every statement instead of running
+          it -- nothing is created or changed.
+      - name: oauth_integration
+        type: boolean
+        description: >
+          Default false. When true, also creates the `claude_mcp_oauth`
+          security integration Claude Desktop's connector needs. Needs a
+          role with `CREATE INTEGRATION`; read the client ID/secret once
+          with `system$show_oauth_client_secrets` afterward and never save
+          them to the repo.

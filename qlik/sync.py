@@ -12,20 +12,23 @@ table the load script (qlik/load_metric_definitions.qvs) reads today. This
 script doesn't query Snowflake itself; that stays a separate, already-built
 step (dbt build), so this script has exactly one job.
 
-  uv run scripts/qlik_sync.py --definitions target/qlik_metric_definitions.json --check
-  uv run scripts/qlik_sync.py --definitions target/qlik_metric_definitions.json --dry-run
-  uv run scripts/qlik_sync.py --definitions target/qlik_metric_definitions.json
+  uv run qlik/sync.py --definitions target/qlik_metric_definitions.json --check
+  uv run qlik/sync.py --definitions target/qlik_metric_definitions.json --dry-run
+  uv run qlik/sync.py --definitions target/qlik_metric_definitions.json
 
 --check validates the input file only, no network. --dry-run builds every
 Engine API payload and prints it, no network. Neither needs Qlik credentials.
 Only the final form opens a connection: it needs QLIK_TENANT_URL (a bare
 host, like mytenant.us.qlikcloud.com), QLIK_API_KEY and QLIK_APP_ID.
 
-What's confirmed against current Qlik docs (see README): the WebSocket URL
-shape, the Bearer-token auth header, the OpenDoc handshake, and the
-CreateMeasure/SetProperties property tree. What's NOT run yet, because
+What's confirmed against current Qlik docs (see qlik/README.md): the
+WebSocket URL shape, the Bearer-token auth header, the OpenDoc handshake, and
+the CreateMeasure/SetProperties property tree. What's NOT run yet, because
 there's no live tenant to run it against: the actual round trip. Test this
 against a real app before trusting it in CI -- start with one metric.
+
+Unit tests: tests/python/test_qlik_sync.py covers everything except the real
+network round trip (sync_to_qlik), same gap as above.
 """
 from __future__ import annotations
 

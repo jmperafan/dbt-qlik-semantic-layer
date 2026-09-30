@@ -2,8 +2,11 @@
 
 A minimal Jaffle Shop project showing a recommended setup for governing
 metrics across dbt, Snowflake and Qlik: metrics are defined once in MetricFlow
-YAML, and Claude, Snowflake and Qlik all read from that one definition. To move
-it into a real project, see [MIGRATION.md](MIGRATION.md).
+YAML, and Claude, Snowflake and Qlik all read from that one definition.
+
+**Building your own version of this?** See [MIGRATION.md](MIGRATION.md) --
+what's actually project-specific versus generic, and the order the pieces
+depend on each other.
 
 ```
                      models/marts/_marts.yml + models/metrics/_metrics.yml
@@ -37,7 +40,7 @@ and it ties logic to a tested, lineage-aware dbt model. A Snowflake-native
 alternative (skip MetricFlow, author semantic views directly with the
 Snowflake Labs `dbt_semantic_view` package) was scoped and rejected: fewer
 moving parts, but the same metric-type ceiling with no fallback engine
-behind it. See the research doc's section 5.0 for the record of that call.
+behind it.
 
 ## What's where
 
@@ -45,14 +48,15 @@ behind it. See the research doc's section 5.0 for the record of that call.
 |------|---------------|
 | [models/marts/_marts.yml](models/marts/_marts.yml) | Semantic models, entities, dimensions and simple metrics. `config.meta.snowflake` holds Cortex synonyms and instructions, never a formula |
 | [models/metrics/_metrics.yml](models/metrics/_metrics.yml) | A ratio (portable everywhere) and a cumulative metric marked `dbt_only` |
-| [scripts/semantic_bridge.py](scripts/semantic_bridge.py) | The Path B (default) pipeline and CI check: fails on lossy metrics, gets an Ossie document, checks Snowflake can load it, merges Cortex extras, writes the deploy SQL |
+| [scripts/semantic_bridge.py](scripts/semantic_bridge.py) | The Path B (default) pipeline and CI check: fails on lossy metrics, gets an Ossie document, checks Snowflake can load it, merges Cortex extras, writes the deploy SQL. See [scripts/README.md](scripts/README.md) |
 | [scripts/ossie-0.1.1-schema.json](scripts/ossie-0.1.1-schema.json) | The official Ossie 0.1.1 JSON schema (Apache-2.0, from `apache/ossie` at tag `osi-0.1.1-rc1`), the version Snowflake accepts |
+| [tests/python/](tests/python/) | Unit tests for `scripts/semantic_bridge.py` and `qlik/sync.py` -- no network, no credentials needed, runs in CI |
 | [models/qlik/qlik_metric_definitions.sql](models/qlik/qlik_metric_definitions.sql) | The modern version of the old Qlik macro: the definitions table, built from the same YAML |
-| [macros/qlik.sql](macros/qlik.sql) | SQL to Qlik translation. Mirrors simple and ratio metrics only, and flags the rest |
-| [qlik/load_metric_definitions.qvs](qlik/load_metric_definitions.qvs) | Qlik load script that turns each mirrored row into a variable |
+| [macros/metrics/qlik.sql](macros/metrics/qlik.sql) | SQL to Qlik translation. Mirrors simple and ratio metrics only, and flags the rest. See [macros/metrics/README.md](macros/metrics/README.md) |
+| [qlik/load_metric_definitions.qvs](qlik/load_metric_definitions.qvs), [qlik/sync.py](qlik/sync.py) | Qlik load script that turns each mirrored row into a variable, and the optional automation that pushes master measures over the Engine API. See [qlik/README.md](qlik/README.md) for how all four Qlik-touching locations fit together |
 | [tests/reconcile_semantic_view.sql](tests/reconcile_semantic_view.sql) | Reconciliation: the semantic view against plain SQL. Fails on any drift |
-| [macros/snowflake_mcp.sql](macros/snowflake_mcp.sql) | `deploy_mcp_server`: the Snowflake-managed MCP server over the semantic view, its grants, and optionally the OAuth integration Claude Desktop connects through |
-| [.github/workflows/semantic-layer-checks.yml](.github/workflows/semantic-layer-checks.yml) | Runs the portability check and the Snowflake readiness check on every pull request, with no warehouse: on dbt v2 (the client's version) as the primary check, dbt v1.12 as a cross-check |
+| [macros/metrics/snowflake_mcp.sql](macros/metrics/snowflake_mcp.sql) | `deploy_mcp_server`: the Snowflake-managed MCP server over the semantic view, its grants, and optionally the OAuth integration Claude Desktop connects through |
+| [.github/workflows/semantic-layer-checks.yml](.github/workflows/semantic-layer-checks.yml) | Runs the portability check and the Snowflake readiness check on every pull request, with no warehouse: on dbt v2 as the primary check, dbt v1.12 as an optional cross-check |
 | [CLAUDE.md](CLAUDE.md), [claude/](claude/), [.claude/skills/governed-metrics/](.claude/skills/governed-metrics/) | The soft guardrail: use governed metrics, never improvise a formula. Packaged as a skill, not just prose, so it's more reliably triggered |
 | [.claude/hooks/](.claude/hooks/), [.claude/settings.json](.claude/settings.json) | The hard guardrail: a `PreToolUse` hook blocks an obvious hand-rolled formula written to a file; a `PostToolUse` hook re-runs the portability check the moment the YAML changes. Neither catches a wrong answer spoken in chat, only one written to disk |
 | [.mcp.json](.mcp.json), [.env.example](.env.example) | Project-scoped MCP servers for Claude Code, with a `.env` for Path B or Path A. No credentials committed |
@@ -66,20 +70,25 @@ This project has one target: `snowflake`. Two steps need no live connection at
 all, because `dbt parse` doesn't connect, and the bridge only reads `target/`:
 
 ```bash
-export SNOWFLAKE_ACCOUNT=ci SNOWFLAKE_USER=ci            # any value; parse never connects
+export SNOWFLAKE_ACCOUNT=ci SNOWFLAKE_USER=ci   # any value; parse never connects
 dbt parse --target snowflake
-python3 scripts/semantic_bridge.py --check                      # portability check, standard library only
-uv run scripts/semantic_bridge.py --schema ANALYTICS.SEMANTIC   # full bridge: Ossie doc + deploy SQL
+python3 scripts/semantic_bridge.py --check      # portability check, standard library only
+uv run scripts/semantic_bridge.py               # full bridge: Ossie doc + deploy SQL
 ```
 
-That's the client's real path (dbt v2, the bridge's default `--source converter`),
-and it runs end to end today: the check passes, and the bridge writes a
-schema-valid `target/ossie/jaffle_shop.yaml` plus the
-`CALL SYSTEM$CREATE_SEMANTIC_VIEW_FROM_OSSIE_YAML(...)` statement in
-`target/deploy_semantic_views.sql`. What it can't prove without real
-credentials: that Snowflake accepts that call, and that `dbt build` (which
-creates the tables `qlik_metric_definitions` reads) succeeds against a live
-warehouse. Once built, the Qlik table comes out as:
+`--schema`/`--model-name` default from `dbt_project.yml`'s `semantic_schema`/
+`semantic_view` vars and the database dbt resolved, so this and
+`deploy_mcp_server` always agree on where the view lives. Pass them
+explicitly to deploy somewhere else.
+
+That's the default path (dbt v2, the bridge's default `--source converter`),
+and it runs end to end without any Snowflake access: the check passes, and
+the bridge writes a schema-valid `target/ossie/jaffle_shop.yaml` (the
+portable Ossie document) plus a native `CREATE OR ALTER SEMANTIC VIEW`
+statement in `target/deploy_semantic_views.sql`. What it can't prove without
+real credentials: that Snowflake accepts that statement, and that
+`dbt build` (which creates the tables `qlik_metric_definitions` reads)
+succeeds against a live warehouse. Once built, the Qlik table comes out as:
 
 | metric_name | qlik_expression | sync_status | sync_note |
 |-------------|-----------------|-------------|-----------|
@@ -92,14 +101,14 @@ warehouse. Once built, the Qlik table comes out as:
 
 ## Getting Ossie out of dbt
 
-The client runs dbt v2, which doesn't write Ossie documents yet -- dbt Labs
-plans to add it, but hasn't committed to a date. Until then there are two
-working routes, and the bridge takes either:
+dbt v2 doesn't write Ossie documents yet -- dbt Labs plans to add it, but
+hasn't committed to a date. Until then there are two working routes, and the
+bridge takes either:
 
 | Route | How | Status |
 |-------|-----|--------|
-| dbt v2 + Apache converter | `dbt parse`, then `uv run scripts/semantic_bridge.py` | The default, and the client's real path. The pinned converter writes Ossie 0.2.0.dev0; the bridge rewraps it as 0.1.1 and validates it against the official schema. Runs end to end today, confirmed above |
-| dbt v1.12, only for this step | `uvx --from 'dbt-core>=1.12,<1.13' --with dbt-snowflake dbt parse --target snowflake`, then the bridge with `--source dbt-v1` | Not needed for this client. Kept as a CI cross-check: dbt writes `osi_document.json` natively, already 0.1.1, and it should agree with the converter route. uvx runs v1 in its own environment, like a container would |
+| dbt v2 + Apache converter | `dbt parse`, then `uv run scripts/semantic_bridge.py` | The default route. The pinned converter writes Ossie 0.2.0.dev0; the bridge rewraps it as 0.1.1 and validates it against the official schema. Runs end to end today, confirmed above |
+| dbt v1.12, only for this step | `uvx --from 'dbt-core>=1.12,<1.13' --with dbt-snowflake dbt parse --target snowflake`, then the bridge with `--source dbt-v1` | Optional. Useful as a CI cross-check: dbt writes `osi_document.json` natively, already 0.1.1, and it should agree with the converter route. uvx runs v1 in its own environment, like a container would |
 | dbt v2, native | Wait | On dbt Labs' roadmap, no committed date |
 
 `require-dbt-version` allows both v1.12 and v2, so the same project serves
@@ -111,18 +120,18 @@ Everything below this line needs real credentials, which aren't set up yet.
 The sequence, once they are:
 
 ```bash
-export SNOWFLAKE_ACCOUNT=... SNOWFLAKE_USER=...
+export SNOWFLAKE_ACCOUNT=... SNOWFLAKE_USER=... SNOWFLAKE_PRIVATE_KEY_PATH=...  # key-pair auth; add SNOWFLAKE_PRIVATE_KEY_PASSPHRASE=... if the key is encrypted
 dbt build --target snowflake
 dbt parse --target snowflake                              # so Ossie sources point at Snowflake tables
-uv run scripts/semantic_bridge.py --schema ANALYTICS.SEMANTIC
-snow sql -f target/deploy_semantic_views.sql              # creates ANALYTICS.SEMANTIC.JAFFLE_SHOP
+uv run scripts/semantic_bridge.py                         # --schema/--model-name default from dbt_project.yml
+snow sql -f target/deploy_semantic_views.sql              # creates/updates ANALYTICS.SEMANTIC.JAFFLE_SHOP
 dbt run-operation deploy_mcp_server --target snowflake    # --args '{dry_run: true}' to print only
 dbt test --target snowflake --select tag:reconciliation --vars '{semantic_views_deployed: true}'
 ```
 
 In CI, [.github/workflows/semantic-layer-checks.yml](.github/workflows/semantic-layer-checks.yml)
 runs the portability check and the Snowflake readiness check on every pull request without
-touching the warehouse: the `checks` job on dbt v2 (the client's version), a
+touching the warehouse: the `checks` job on dbt v2, an optional
 `cross-check` job on dbt v1.12. The reconciliation test runs after a deploy.
 
 ## Connect Claude
@@ -168,43 +177,11 @@ Hooks only fire on tool calls. They cannot stop Claude from saying a wrong
 number in plain conversation; only the skill and the tool being the easier
 choice cover that half.
 
-## Automating Qlik master items
+## Qlik
 
-Today, a human wires each master measure to its variable once, by hand, in
-the Qlik UI (`$(m_revenue)` instead of a hardcoded `Sum(amount)`); every
-reload after that keeps it current automatically. That one-time step can be
-automated instead, and now is: [scripts/qlik_sync.py](scripts/qlik_sync.py)
-pushes master measures over Qlik's Engine API.
-
-```bash
-uv run scripts/qlik_sync.py --definitions target/qlik_metric_definitions.json --check     # validates the input, no network
-uv run scripts/qlik_sync.py --definitions target/qlik_metric_definitions.json --dry-run   # prints every payload, no network
-uv run scripts/qlik_sync.py --definitions target/qlik_metric_definitions.json             # the real push, needs Qlik credentials
-```
-
-Master items aren't exposed through the simpler REST/QRS API, only the
-WebSocket-based Engine API (QIX), confirmed against current Qlik docs. This
-script is a small, purpose-built JSON-RPC client for it, not a wrapper
-around the official `enigma.js` library, so it has exactly one job: for each
-mirrored metric, check whether its measure already exists (`GetObject`) and
-either update it (`SetProperties`) or create it (`CreateMeasure`).
-
-**What's tested:** the input validation and the exact JSON-RPC payload for
-every metric in the sample fixture
-([tests/fixtures/qlik_metric_definitions.sample.json](tests/fixtures/qlik_metric_definitions.sample.json)),
-both run locally with no network. **What isn't:** the live round trip.
-There's no Qlik Cloud tenant to test against yet, the same gap as the live
-Snowflake deploy. Test it against one metric in a real app before trusting
-it in CI.
-
-One caution that applies whether a measure is set by hand or pushed by this
-script: nesting variables inside a master measure (any ratio metric, like
-`average_order_value`) is a documented limitation, not just untested by us.
-Qlik's own community reports that parameterized dollar-sign expansion
-doesn't work in master measures at all, and that nesting multiple variables
-fails inconsistently. Test it in a real app before relying on it. The
-fallback is to have the bridge write the ratio's flattened expression as one
-variable instead of composing two.
+Everything Qlik-touching -- the load script, the optional master-item push
+automation, and why the macro and model pieces live where they do -- is
+indexed in [qlik/README.md](qlik/README.md).
 
 ## Design rules this sketch enforces
 
@@ -223,61 +200,3 @@ variable instead of composing two.
   cleanly to Qlik. The bridge fails on any metric with no table-qualified column
 - **Qlik mirrors definitions, not values**, and only the shapes that translate
   cleanly. Everything else says so in `sync_note`
-
-## Tested so far, and what isn't yet
-
-Tested locally, against `--target snowflake`, dummy credentials, no live
-connection:
-
-- **dbt 2.0.6, the client's version:** `dbt parse --target snowflake` runs
-  clean (one expected warning: semantic manifest validation is skipped
-  without a dbt platform connection). Confirms parse never opens a warehouse
-  connection
-- **The bridge's default route end to end** (`--source converter`, the one
-  the client will actually run): validation passes 5 portable metrics, 1
-  `dbt_only` skipped; the Apache Ossie converter produces a schema-valid
-  0.1.1 document, every field and metric table-qualified; Cortex extras
-  merged into `ai_context`; `target/deploy_semantic_views.sql` comes out as
-  a real, well-formed `CALL SYSTEM$CREATE_SEMANTIC_VIEW_FROM_OSSIE_YAML(...)`
-- **The validation's fail path:** a lossy metric without `dbt_only`
-  correctly fails the build
-- **dbt v1.12.5, the cross-check route:** parses the project unchanged and
-  writes `osi_document.json` natively as Ossie 0.1.1; `--source dbt-v1`
-  passes the same Snowflake-readiness checks as the converter route, on the
-  same metrics
-- **Both CI jobs' commands**, run locally with the same dummy credentials CI
-  uses
-- **`deploy_mcp_server`** in dry-run mode, rendering the statements from the vars
-- **`qlik_sync.py`**, both `--check` and `--dry-run`, against the sample
-  fixture: correctly excludes the `not_mirrored` metric and builds a
-  schema-correct `CreateMeasure`/`SetProperties` payload for each of the
-  other five
-
-Checked against current vendor docs, not run: `SYSTEM$CREATE_SEMANTIC_VIEW_FROM_OSSIE_YAML`
-and `SYSTEM$READ_OSSIE_YAML_FROM_SEMANTIC_VIEW` are confirmed live in
-Snowflake's docs (the `_OSI_YAML` names are now deprecated aliases); metric
-qualification, `SEMANTIC_VIEW()` naming and query privileges; Qlik's LET, SET
-and nested dollar-sign expansion; Claude Code's `.mcp.json` variables; Claude
-custom connectors.
-
-Not run yet, pending a live Snowflake account:
-
-- **Everything that needs a warehouse connection**: `dbt build` (so the
-  `qlik_metric_definitions` table doesn't exist yet), the actual
-  `CALL SYSTEM$CREATE_SEMANTIC_VIEW_FROM_OSSIE_YAML`, the MCP server, the
-  grants and the OAuth integration
-- **Qlik**: the load script in a real app, and a chart using
-  `$(m_average_order_value)`. This one is a real risk, not just unverified:
-  Qlik's own community documents nested master-measure variables as fragile
-- **The Qlik master-item push (`qlik_sync.py`) actually reaching Qlik**:
-  the payloads are built and validated; the live round trip needs a Qlik
-  Cloud tenant and API key
-- **Semantic validation.** `dbt parse` skips it without a dbt platform
-  connection, and `dbt sl validate` needs one
-
-Answered while building this, from an open pre-session question list:
-
-- dbt v2 doesn't write `osi_document.json` (2.0.6, local parse). dbt v1.12
-  does, as Ossie 0.1.1
-- Snowflake marks `SYSTEM$CREATE_SEMANTIC_VIEW_FROM_OSI_YAML` as deprecated.
-  Use `..._FROM_OSSIE_YAML`

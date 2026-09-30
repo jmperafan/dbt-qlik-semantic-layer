@@ -3,32 +3,44 @@
 # No warehouse needed. dbt parse doesn't connect, and the bridge only reads
 # target/. Deploying to Snowflake stays a separate step with real credentials.
 #
-# The client runs dbt v2, so `checks` parses with v2 and takes the bridge's
-# default `--source converter` route (Apache converter on semantic_manifest.json,
-# rewrapped to Ossie 0.1.1) -- that's the path that actually ships. `cross-check`
-# additionally parses with dbt v1.12, which writes osi_document.json natively, and
-# runs `--source dbt-v1` purely to confirm the two independently-built converters
-# agree. It isn't required for this client and can be dropped if it gets noisy.
+# `python-tests` unit-tests scripts/semantic_bridge.py and qlik/sync.py --
+# no dbt, no warehouse, no credentials at all.
+#
+# `checks` parses with dbt v2 and takes the bridge's default `--source converter`
+# route (Apache converter on semantic_manifest.json, rewrapped to Ossie 0.1.1) --
+# the primary path most projects will run. `cross-check` additionally parses with
+# dbt v1.12, which writes osi_document.json natively, and runs `--source dbt-v1`
+# purely to confirm the two independently-built converters agree. It's optional --
+# drop it if you don't need the extra confirmation, or if it gets noisy.
 
 name: semantic-layer-checks
 
 on:
   pull_request:
-    paths: ["models/**", "macros/**", "scripts/**", "dbt_project.yml"]
+    paths: ["models/**", "macros/**", "scripts/**", "qlik/**", "tests/python/**", "dbt_project.yml"]
 
 jobs:
+  python-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+
+      - name: Unit tests for scripts/semantic_bridge.py and qlik/sync.py (no network, no credentials)
+        run: uv run --with pytest --with pyyaml --with jsonschema pytest tests/python -v
+
   checks:
     runs-on: ubuntu-latest
     env:
       # Parse doesn't connect, but profiles.yml still reads these. Adjust to
-      # whatever the client's profile expects.
+      # whatever your own profile expects.
       SNOWFLAKE_ACCOUNT: ci
       SNOWFLAKE_USER: ci
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.2.0
 
-      - name: Parse with dbt v2, the client's version
+      - name: Parse with dbt v2
         run: dbt parse --target snowflake
 
       - name: Portability check and the meta rule
@@ -44,7 +56,7 @@ jobs:
       SNOWFLAKE_USER: ci
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.2.0
 
       - name: Parse with dbt v1.12, which writes osi_document.json natively
         run: uvx --from 'dbt-core>=1.12,<1.13' --with dbt-snowflake dbt parse --target snowflake

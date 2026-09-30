@@ -34,8 +34,11 @@
 
 
 {% macro qlik_not_mirrored_reason(metric) %}
+    {%- set aggs = ['sum', 'count', 'count_distinct', 'average', 'min', 'max'] -%}
     {%- if metric.metric_type == 'simple' and metric.filter -%}
         Filtered metric: needs set analysis, build it by hand in Qlik
+    {%- elif metric.metric_type == 'simple' and metric.type_params.metric_aggregation_params.agg not in aggs -%}
+        {{ metric.type_params.metric_aggregation_params.agg }} has no Qlik equivalent here: build it by hand in Qlik
     {%- elif metric.metric_type == 'simple' -%}
         Expression is not a plain column: build it by hand in Qlik
     {%- elif metric.metric_type == 'ratio'
