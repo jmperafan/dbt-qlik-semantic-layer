@@ -17,6 +17,6 @@ up in the generated docs site same as any model). The header comment in each
 `.sql` file explains the non-obvious *why*; `_macros.yml` covers the
 mechanical *what argument does what*.
 
-See [qlik/README.md](../../qlik/README.md) for how these fit into the wider
+See [qlik/README.md](../../bridge/qlik/README.md) for how these fit into the wider
 Qlik picture, and [../../README.md](../../README.md) for
 `deploy_mcp_server`'s place in the Snowflake deploy sequence.

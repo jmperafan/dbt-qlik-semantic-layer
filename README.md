@@ -15,15 +15,15 @@ depend on each other.
          ┌───────────────────────────────────┼───────────────────────────────────┐
          │ Path B (default: AI context)      │ Path A (fallback: dbt_only)       │ Qlik
          ▼                                   ▼                                   ▼
-  scripts/semantic_bridge.py           dbt Semantic Layer            models/qlik/qlik_metric_definitions
+  bridge/semantic_bridge.py            dbt Semantic Layer            models/qlik/qlik_metric_definitions
   check → Ossie → + Cortex extras             │                          (generated from the graph)
          │                                    │                                   │
          ▼                                    │                                   ▼
-  Snowflake semantic view                     │                          qlik/load_metric_definitions.qvs
+  Snowflake semantic view                     │                          bridge/qlik/load_metric_definitions.qvs
   + deploy_mcp_server macro                   │                          (one variable per metric)
          ▼                                    ▼
   Snowflake MCP ───────────► Claude Code / Claude Desktop ◄─────────── dbt MCP
-                           CLAUDE.md, claude/desktop_project_instructions.md,
+                           CLAUDE.md, .claude/desktop_project_instructions.md,
                            .claude/skills/governed-metrics/, .claude/hooks/
 ```
 
@@ -48,16 +48,16 @@ behind it.
 |------|---------------|
 | [models/marts/_marts.yml](models/marts/_marts.yml) | Semantic models, entities, dimensions and simple metrics. `config.meta.snowflake` holds Cortex synonyms and instructions, never a formula |
 | [models/metrics/_metrics.yml](models/metrics/_metrics.yml) | A ratio (portable everywhere) and a cumulative metric marked `dbt_only` |
-| [scripts/semantic_bridge.py](scripts/semantic_bridge.py) | The Path B (default) pipeline and CI check: fails on lossy metrics, gets an Ossie document, checks Snowflake can load it, merges Cortex extras, writes the deploy SQL. See [scripts/README.md](scripts/README.md) |
-| [scripts/ossie-0.1.1-schema.json](scripts/ossie-0.1.1-schema.json) | The official Ossie 0.1.1 JSON schema (Apache-2.0, from `apache/ossie` at tag `osi-0.1.1-rc1`), the version Snowflake accepts |
-| [tests/python/](tests/python/) | Unit tests for `scripts/semantic_bridge.py` and `qlik/sync.py` -- no network, no credentials needed, runs in CI |
+| [bridge/semantic_bridge.py](bridge/semantic_bridge.py) | The Path B (default) pipeline and CI check: fails on lossy metrics, gets an Ossie document, checks Snowflake can load it, merges Cortex extras, writes the deploy SQL. See [bridge/README.md](bridge/README.md) |
+| [bridge/ossie-0.1.1-schema.json](bridge/ossie-0.1.1-schema.json) | The official Ossie 0.1.1 JSON schema (Apache-2.0, from `apache/ossie` at tag `osi-0.1.1-rc1`), the version Snowflake accepts |
+| [bridge/tests/](bridge/tests/) | Unit tests for `bridge/semantic_bridge.py` and `bridge/qlik/sync.py` -- no network, no credentials needed, runs in CI |
 | [models/qlik/qlik_metric_definitions.sql](models/qlik/qlik_metric_definitions.sql) | The modern version of the old Qlik macro: the definitions table, built from the same YAML |
 | [macros/metrics/qlik.sql](macros/metrics/qlik.sql) | SQL to Qlik translation. Mirrors simple and ratio metrics only, and flags the rest. See [macros/metrics/README.md](macros/metrics/README.md) |
-| [qlik/load_metric_definitions.qvs](qlik/load_metric_definitions.qvs), [qlik/sync.py](qlik/sync.py) | Qlik load script that turns each mirrored row into a variable, and the optional automation that pushes master measures over the Engine API. See [qlik/README.md](qlik/README.md) for how all four Qlik-touching locations fit together |
+| [bridge/qlik/load_metric_definitions.qvs](bridge/qlik/load_metric_definitions.qvs), [bridge/qlik/sync.py](bridge/qlik/sync.py) | Qlik load script that turns each mirrored row into a variable, and the optional automation that pushes master measures over the Engine API. See [bridge/qlik/README.md](bridge/qlik/README.md) for how all four Qlik-touching locations fit together |
 | [tests/reconcile_semantic_view.sql](tests/reconcile_semantic_view.sql) | Reconciliation: the semantic view against plain SQL. Fails on any drift |
 | [macros/metrics/snowflake_mcp.sql](macros/metrics/snowflake_mcp.sql) | `deploy_mcp_server`: the Snowflake-managed MCP server over the semantic view, its grants, and optionally the OAuth integration Claude Desktop connects through |
 | [.github/workflows/semantic-layer-checks.yml](.github/workflows/semantic-layer-checks.yml) | Runs the portability check and the Snowflake readiness check on every pull request, with no warehouse: on dbt v2 as the primary check, dbt v1.12 as an optional cross-check |
-| [CLAUDE.md](CLAUDE.md), [claude/](claude/), [.claude/skills/governed-metrics/](.claude/skills/governed-metrics/) | The soft guardrail: use governed metrics, never improvise a formula. Packaged as a skill, not just prose, so it's more reliably triggered |
+| [CLAUDE.md](CLAUDE.md), [.claude/desktop_project_instructions.md](.claude/desktop_project_instructions.md), [.claude/skills/governed-metrics/](.claude/skills/governed-metrics/) | The soft guardrail: use governed metrics, never improvise a formula. Packaged as a skill, not just prose, so it's more reliably triggered |
 | [.claude/hooks/](.claude/hooks/), [.claude/settings.json](.claude/settings.json) | The hard guardrail: a `PreToolUse` hook blocks an obvious hand-rolled formula written to a file; a `PostToolUse` hook re-runs the portability check the moment the YAML changes. Neither catches a wrong answer spoken in chat, only one written to disk |
 | [.mcp.json](.mcp.json), [.env.example](.env.example) | Project-scoped MCP servers for Claude Code, with a `.env` for Path B or Path A. No credentials committed |
 
@@ -72,8 +72,8 @@ all, because `dbt parse` doesn't connect, and the bridge only reads `target/`:
 ```bash
 export SNOWFLAKE_ACCOUNT=ci SNOWFLAKE_USER=ci   # any value; parse never connects
 dbt parse --target snowflake
-python3 scripts/semantic_bridge.py --check      # portability check, standard library only
-uv run scripts/semantic_bridge.py               # full bridge: Ossie doc + deploy SQL
+python3 bridge/semantic_bridge.py --check       # portability check, standard library only
+uv run bridge/semantic_bridge.py                # full bridge: Ossie doc + deploy SQL
 ```
 
 `--schema`/`--model-name` default from `dbt_project.yml`'s `semantic_schema`/
@@ -107,7 +107,7 @@ bridge takes either:
 
 | Route | How | Status |
 |-------|-----|--------|
-| dbt v2 + Apache converter | `dbt parse`, then `uv run scripts/semantic_bridge.py` | The default route. The pinned converter writes Ossie 0.2.0.dev0; the bridge rewraps it as 0.1.1 and validates it against the official schema. Runs end to end today, confirmed above |
+| dbt v2 + Apache converter | `dbt parse`, then `uv run bridge/semantic_bridge.py` | The default route. The pinned converter writes Ossie 0.2.0.dev0; the bridge rewraps it as 0.1.1 and validates it against the official schema. Runs end to end today, confirmed above |
 | dbt v1.12, only for this step | `uvx --from 'dbt-core>=1.12,<1.13' --with dbt-snowflake dbt parse --target snowflake`, then the bridge with `--source dbt-v1` | Optional. Useful as a CI cross-check: dbt writes `osi_document.json` natively, already 0.1.1, and it should agree with the converter route. uvx runs v1 in its own environment, like a container would |
 | dbt v2, native | Wait | On dbt Labs' roadmap, no committed date |
 
@@ -123,7 +123,7 @@ The sequence, once they are:
 export SNOWFLAKE_ACCOUNT=... SNOWFLAKE_USER=... SNOWFLAKE_PRIVATE_KEY_PATH=...  # key-pair auth; add SNOWFLAKE_PRIVATE_KEY_PASSPHRASE=... if the key is encrypted
 dbt build --target snowflake
 dbt parse --target snowflake                              # so Ossie sources point at Snowflake tables
-uv run scripts/semantic_bridge.py                         # --schema/--model-name default from dbt_project.yml
+uv run bridge/semantic_bridge.py                          # --schema/--model-name default from dbt_project.yml
 snow sql -f target/deploy_semantic_views.sql              # creates/updates ANALYTICS.SEMANTIC.JAFFLE_SHOP
 dbt run-operation deploy_mcp_server --target snowflake    # --args '{dry_run: true}' to print only
 dbt test --target snowflake --select tag:reconciliation --vars '{semantic_views_deployed: true}'
@@ -145,7 +145,7 @@ touching the warehouse: the `checks` job on dbt v2, an optional
   setup
 - **Claude Desktop:** add a custom connector, the Snowflake MCP server on
   Path B or the remote dbt MCP server on Path A (OAuth needs Starter or
-  above). Then paste [claude/desktop_project_instructions.md](claude/desktop_project_instructions.md)
+  above). Then paste [.claude/desktop_project_instructions.md](.claude/desktop_project_instructions.md)
   into the project's instructions. On Claude Team and Enterprise, only an Owner
   can add the connector. Desktop doesn't run project hooks, so the skill (or
   the pasted instructions) is the only guardrail there
@@ -181,7 +181,7 @@ choice cover that half.
 
 Everything Qlik-touching -- the load script, the optional master-item push
 automation, and why the macro and model pieces live where they do -- is
-indexed in [qlik/README.md](qlik/README.md).
+indexed in [bridge/qlik/README.md](bridge/qlik/README.md).
 
 ## Design rules this sketch enforces
 

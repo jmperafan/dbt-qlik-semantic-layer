@@ -38,7 +38,7 @@ Sources, because dbt v2 doesn't write Ossie yet (it's on the roadmap, no date):
 Run after parsing against Snowflake, so dataset sources point at real tables:
 
   dbt parse --target snowflake
-  uv run scripts/semantic_bridge.py --schema ANALYTICS.SEMANTIC
+  uv run bridge/semantic_bridge.py --schema ANALYTICS.SEMANTIC
   snow sql -f target/deploy_semantic_views.sql
 
 Exits non-zero on anything lossy, so CI can use it as the check. `--check` runs

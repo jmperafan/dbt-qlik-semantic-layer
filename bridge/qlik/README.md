@@ -2,15 +2,16 @@
 
 Four places touch Qlik in this project. Two are locked in place by dbt's own
 conventions -- macros and models have to live under `macros/` and `models/`
-for dbt to find them, the same reason [MIGRATION.md](../MIGRATION.md) tells
+for dbt to find them, the same reason [MIGRATION.md](../../MIGRATION.md) tells
 you to copy them into your own `macros/`/`models/qlik/` verbatim. This
 directory holds the other two: the actual Qlik load script, and the optional
-Python automation that pairs with it.
+Python automation that pairs with it, grouped under `bridge/` with the
+Snowflake half since both are plain scripts outside dbt's layout.
 
 | Where | What |
 |-------|------|
-| [../macros/metrics/qlik.sql](../macros/metrics/qlik.sql) | SQL to Qlik translation: `qlik_expression`, `qlik_not_mirrored_reason`, `sql_string`. Must live under `macros/` (dbt convention) -- see [../macros/metrics/README.md](../macros/metrics/README.md) |
-| [../models/qlik/](../models/qlik/) | The dbt model that builds `qlik_metric_definitions` from `graph.metrics`, one row per metric. Must live under `models/` (dbt convention) |
+| [../../macros/metrics/qlik.sql](../../macros/metrics/qlik.sql) | SQL to Qlik translation: `qlik_expression`, `qlik_not_mirrored_reason`, `sql_string`. Must live under `macros/` (dbt convention) -- see [../../macros/metrics/README.md](../../macros/metrics/README.md) |
+| [../../models/qlik/](../../models/qlik/) | The dbt model that builds `qlik_metric_definitions` from `graph.metrics`, one row per metric. Must live under `models/` (dbt convention) |
 | [load_metric_definitions.qvs](load_metric_definitions.qvs) | The Qlik load script itself. Paste it into the Qlik app; it reads `qlik_metric_definitions` and turns each mirrored row into a `$(m_<metric>)` variable |
 | [sync.py](sync.py) | Optional automation: pushes master measures over Qlik's Engine API instead of wiring each one by hand. Everything below is about this script |
 
@@ -23,9 +24,9 @@ automated instead, and now is: [sync.py](sync.py) pushes master measures over
 Qlik's Engine API.
 
 ```bash
-uv run qlik/sync.py --definitions target/qlik_metric_definitions.json --check     # validates the input, no network
-uv run qlik/sync.py --definitions target/qlik_metric_definitions.json --dry-run   # prints every payload, no network
-uv run qlik/sync.py --definitions target/qlik_metric_definitions.json             # the real push, needs Qlik credentials
+uv run bridge/qlik/sync.py --definitions target/qlik_metric_definitions.json --check     # validates the input, no network
+uv run bridge/qlik/sync.py --definitions target/qlik_metric_definitions.json --dry-run   # prints every payload, no network
+uv run bridge/qlik/sync.py --definitions target/qlik_metric_definitions.json             # the real push, needs Qlik credentials
 ```
 
 Master items aren't exposed through the simpler REST/QRS API, only the
@@ -39,7 +40,7 @@ either update it (`SetProperties`) or create it (`CreateMeasure`).
 metric in the sample fixture
 ([../tests/fixtures/qlik_metric_definitions.sample.json](../tests/fixtures/qlik_metric_definitions.sample.json)),
 and the create/update branching, all in
-[../tests/python/test_qlik_sync.py](../tests/python/test_qlik_sync.py) -- no
+[../tests/test_qlik_sync.py](../tests/test_qlik_sync.py) -- no
 network needed. **What isn't:** the live round trip (`sync_to_qlik`). There's
 no Qlik Cloud tenant to test against yet. Test it against one metric in a
 real app before trusting it in CI.

@@ -31,13 +31,13 @@ running on the platform.
 
 1. **Build in development.** `dbt build`, then look at `qlik_metric_definitions`.
    Every metric is either mirrored or says why not
-2. **Run the portability check.** `python3 scripts/semantic_bridge.py --check`.
+2. **Run the portability check.** `python3 bridge/semantic_bridge.py --check`.
    Fix each failure, or mark the metric `config.meta.dbt_only: true` as a
    reviewed decision
 3. **Path A, Starter or above:** the dbt Semantic Layer needs a production job
    that parses the project; `dbt build` does. Configure the Semantic Layer for
    that environment, then fill the Path A block of `.env` for dbt MCP
-4. **Path B:** `dbt parse --target <prod>`, then `uv run scripts/semantic_bridge.py`
+4. **Path B:** `dbt parse --target <prod>`, then `uv run bridge/semantic_bridge.py`
    (it defaults `--schema`/`--model-name` from `semantic_schema`/`semantic_view`
    and the resolved database, so the bridge and `deploy_mcp_server` always agree
    on where the view lives), run `target/deploy_semantic_views.sql`, then
@@ -47,7 +47,7 @@ running on the platform.
 6. **Qlik.** Paste the load script, set the two variables, reload, and check
    one chart using `$(m_average_order_value)`. Wire each master measure to
    its variable by hand once, or push them with
-   `uv run qlik/sync.py --definitions <export>.json` once you have a Qlik
+   `uv run bridge/qlik/sync.py --definitions <export>.json` once you have a Qlik
    Cloud tenant and API key
 7. **CI.** Add the workflow, and open a pull request that breaks a metric on
    purpose to see it fail

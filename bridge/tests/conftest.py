@@ -1,13 +1,13 @@
-"""Shared fixtures for the scripts/ unit tests.
+"""Shared fixtures for the bridge/ unit tests.
 
-Neither scripts/semantic_bridge.py nor qlik/sync.py is a package (no
+Neither bridge/semantic_bridge.py nor bridge/qlik/sync.py is a package (no
 __init__.py, no pyproject.toml) -- they're single-file `uv run` scripts, on
-purpose, so `uv run scripts/semantic_bridge.py ...` works with zero install
-step. To test them as plain Python modules, this file puts scripts/ and
-qlik/ on sys.path so tests can `import semantic_bridge` / `import sync`
+purpose, so `uv run bridge/semantic_bridge.py ...` works with zero install
+step. To test them as plain Python modules, this file puts bridge/ and
+bridge/qlik/ on sys.path so tests can `import semantic_bridge` / `import sync`
 directly, the standard recipe for testing a script with no packaging.
 
-Run with: uv run --with pytest --with pyyaml --with jsonschema pytest tests/python -v
+Run with: uv run --with pytest --with pyyaml --with jsonschema pytest bridge/tests -v
 """
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-for directory in ("scripts", "qlik"):
+for directory in ("bridge", "bridge/qlik"):
     path = str(REPO_ROOT / directory)
     if path not in sys.path:
         sys.path.insert(0, path)
@@ -29,7 +29,7 @@ import pytest
 # metrics, ...), and mutating a single loaded blob per test reads worse than
 # a handful of `ossie_*(...)` calls that show only what each test cares
 # about. Every builder produces something that validates against the real
-# vendored scripts/ossie-0.1.1-schema.json -- required fields (checked
+# vendored bridge/ossie-0.1.1-schema.json -- required fields (checked
 # against the schema itself, not guessed): SemanticModel needs
 # name+datasets (datasets non-empty), Dataset needs name+source, Field and
 # Metric need name+expression, Relationship needs name/from/to/
@@ -101,4 +101,4 @@ def mf_metric(name: str, type: str = "simple", *, type_params=None, filter=None,
 
 @pytest.fixture
 def sample_qlik_definitions_path() -> Path:
-    return REPO_ROOT / "tests" / "fixtures" / "qlik_metric_definitions.sample.json"
+    return REPO_ROOT / "bridge" / "tests" / "fixtures" / "qlik_metric_definitions.sample.json"

@@ -25,8 +25,8 @@ version:
    instructions only, never a formula. A `PostToolUse` hook re-runs the
    portability check on save
 2. `dbt build --target snowflake`, then check `qlik_metric_definitions`
-3. `dbt parse --target snowflake && uv run scripts/semantic_bridge.py --check`.
+3. `dbt parse --target snowflake && uv run bridge/semantic_bridge.py --check`.
    If it fails, fix the metric or mark it `config.meta.dbt_only: true`
 4. To push the mirrored metrics to Qlik as master measures, see
-   `qlik/sync.py --check` (validates the definitions, no network) and
-   [qlik/README.md](qlik/README.md)
+   `bridge/qlik/sync.py --check` (validates the definitions, no network) and
+   [bridge/qlik/README.md](bridge/qlik/README.md)

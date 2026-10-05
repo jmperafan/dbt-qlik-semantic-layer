@@ -3,7 +3,7 @@
 # No warehouse needed. dbt parse doesn't connect, and the bridge only reads
 # target/. Deploying to Snowflake stays a separate step with real credentials.
 #
-# `python-tests` unit-tests scripts/semantic_bridge.py and qlik/sync.py --
+# `python-tests` unit-tests bridge/semantic_bridge.py and bridge/qlik/sync.py --
 # no dbt, no warehouse, no credentials at all.
 #
 # `checks` parses with dbt v2 and takes the bridge's default `--source converter`
@@ -17,7 +17,7 @@ name: semantic-layer-checks
 
 on:
   pull_request:
-    paths: ["models/**", "macros/**", "scripts/**", "qlik/**", "tests/python/**", "dbt_project.yml"]
+    paths: ["models/**", "macros/**", "bridge/**", "dbt_project.yml"]
 
 jobs:
   python-tests:
@@ -26,8 +26,8 @@ jobs:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v10.2.0
 
-      - name: Unit tests for scripts/semantic_bridge.py and qlik/sync.py (no network, no credentials)
-        run: uv run --with pytest --with pyyaml --with jsonschema pytest tests/python -v
+      - name: Unit tests for bridge/semantic_bridge.py and bridge/qlik/sync.py (no network, no credentials)
+        run: uv run --with pytest --with pyyaml --with jsonschema pytest bridge/tests -v
 
   checks:
     runs-on: ubuntu-latest
@@ -44,10 +44,10 @@ jobs:
         run: dbt parse --target snowflake
 
       - name: Portability check and the meta rule
-        run: python3 scripts/semantic_bridge.py --check
+        run: python3 bridge/semantic_bridge.py --check
 
       - name: Snowflake readiness (Ossie 0.1.1 schema, dialects, qualified columns)
-        run: uv run scripts/semantic_bridge.py --schema CI.SEMANTIC
+        run: uv run bridge/semantic_bridge.py --schema CI.SEMANTIC
 
   cross-check:
     runs-on: ubuntu-latest
@@ -62,4 +62,4 @@ jobs:
         run: uvx --from 'dbt-core>=1.12,<1.13' --with dbt-snowflake dbt parse --target snowflake
 
       - name: Same Snowflake readiness check, via the native route
-        run: uv run scripts/semantic_bridge.py --source dbt-v1 --schema CI.SEMANTIC
+        run: uv run bridge/semantic_bridge.py --source dbt-v1 --schema CI.SEMANTIC

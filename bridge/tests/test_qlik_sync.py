@@ -1,8 +1,8 @@
-"""Unit tests for qlik/sync.py.
+"""Unit tests for bridge/qlik/sync.py.
 
 Covers everything except sync_to_qlik itself (the real websocket round trip
 to a Qlik Cloud tenant) -- there's no live tenant to test that against, the
-same honestly-documented gap as the module docstring and qlik/README.md.
+same honestly-documented gap as the module docstring and bridge/qlik/README.md.
 """
 from __future__ import annotations
 

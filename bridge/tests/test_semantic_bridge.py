@@ -1,4 +1,4 @@
-"""Unit tests for scripts/semantic_bridge.py.
+"""Unit tests for bridge/semantic_bridge.py.
 
 Covers everything in that file except from_converter (needs the pinned git
 dependency apache-ossie-dbt -- already exercised for real by the `checks` job

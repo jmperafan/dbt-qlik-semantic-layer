@@ -4,7 +4,7 @@ layer YAML changes, instead of waiting for CI.
 
 Reads a PostToolUse hook payload from stdin (tool_name, tool_input.file_path,
 cwd). Only acts on models/marts/_marts.yml and models/metrics/_metrics.yml.
-Runs `python3 scripts/semantic_bridge.py --check`; on failure, prints its
+Runs `python3 bridge/semantic_bridge.py --check`; on failure, prints its
 output to stderr and exits 2, which surfaces the check's error back to Claude
 immediately. `dbt parse` must already have been run in this session for the
 check to see the latest manifest; the check itself says so if target/ is stale
@@ -36,7 +36,7 @@ def main() -> None:
 
     project_dir = Path(payload.get("cwd") or ".")
     result = subprocess.run(
-        [sys.executable, str(project_dir / "scripts" / "semantic_bridge.py"), "--check"],
+        [sys.executable, str(project_dir / "bridge" / "semantic_bridge.py"), "--check"],
         cwd=project_dir,
         capture_output=True,
         text=True,
