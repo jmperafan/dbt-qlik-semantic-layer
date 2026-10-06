@@ -53,6 +53,7 @@ models:
         type: simple
         agg: sum
         expr: amount
+        filter: "{{ Dimension('order__status') }} = 'completed'"
         config:
           meta:
             snowflake:
