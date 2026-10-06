@@ -3,11 +3,11 @@
 semantic layer.
 
 Metric logic lives in models/marts/, models/metrics/ (MetricFlow YAML) and
-macros/ (the Qlik translation). A sum(), count(), avg() written anywhere else
--- a scratch SQL file, a new Qlik script, a pandas snippet -- is a new,
-unreviewed metric. This is a heuristic pattern match, not a parser: it will
-miss creative rewrites and can false-positive on unrelated words. It's a nudge
-that costs a retry, not a proof.
+deploy/ (the Qlik and Snowflake translation code). A sum(), count(), avg()
+written anywhere else -- a scratch SQL file, a new Qlik script, a pandas
+snippet -- is a new, unreviewed metric. This is a heuristic pattern match,
+not a parser: it will miss creative rewrites and can false-positive on
+unrelated words. It's a nudge that costs a retry, not a proof.
 
 Reads a PreToolUse hook payload from stdin (tool_name, tool_input.file_path,
 tool_input.content for Write, tool_input.new_string for Edit,
@@ -21,7 +21,7 @@ import json
 import re
 import sys
 
-ALLOWED_PATH_PARTS = ("models/marts/", "models/metrics/", "macros/")
+ALLOWED_PATH_PARTS = ("models/marts/", "models/metrics/", "deploy/")
 # Anchored to a path boundary (start of string or after a "/"), not a bare
 # substring: "custom_models/marts/x.sql" contains "models/marts/" too, and
 # shouldn't count as the real models/marts/.
@@ -44,7 +44,7 @@ def main() -> None:
         sys.exit(0)
 
     if file_path.endswith((".yml", ".yaml")) or ALLOWED_PATH_PATTERN.search(file_path):
-        sys.exit(0)  # the semantic layer and its translation macros are the allowed home
+        sys.exit(0)  # the semantic layer and its translation code are the allowed home
 
     new_text = tool_input.get("content") or tool_input.get("new_string") or tool_input.get("new_source") or ""
     match = AGGREGATION_PATTERN.search(new_text)
