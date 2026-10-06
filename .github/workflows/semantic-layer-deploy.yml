@@ -74,6 +74,15 @@ jobs:
           SNOWFLAKE_PRIVATE_KEY_RAW: ${{ secrets.SNOWFLAKE_PRIVATE_KEY }}
 
       - name: Serve it over MCP
+        # continue-on-error: none of this account's roles (TRANSFORMER,
+        # METRICS_READER, INSTRUCTOR) have MANAGE GRANTS/ownership on
+        # BREAKOUT_LABS, so the grants here fail with a real Snowflake
+        # permissions error -- confirmed 2026-10-06, not a bug in this step.
+        # Non-blocking so the rest of the pipeline (which doesn't depend on
+        # these grants) still runs and gets validated. Remove this once
+        # someone with ACCOUNTADMIN/SECURITYADMIN runs the grants once, or
+        # grants one of these roles MANAGE GRANTS.
+        continue-on-error: true
         run: uv run bridge/snowflake_admin.py mcp-server
 
       - name: Reconcile against plain SQL
