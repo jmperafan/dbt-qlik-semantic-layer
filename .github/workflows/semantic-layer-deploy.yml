@@ -1,0 +1,111 @@
+# Deploys the semantic layer to Snowflake and Qlik on every merge to main.
+#
+# The experience this gives contributors: edit the YAML, open a PR
+# (semantic-layer-checks.yml gates it), merge. Nothing else by hand.
+#
+# Unlike semantic-layer-checks.yml, this touches a real warehouse and a real
+# Qlik tenant, so it never runs on pull_request -- only push to main, or a
+# manual run via workflow_dispatch for testing it before trusting it live.
+#
+# Repo secrets this needs: SNOWFLAKE_ACCOUNT, SNOWFLAKE_USER,
+# SNOWFLAKE_DATABASE, SNOWFLAKE_PRIVATE_KEY (raw PEM, no passphrase today),
+# QLIK_TENANT_URL, QLIK_API_KEY, QLIK_APP_ID. Role and warehouse fall back to
+# profiles.yml's defaults (TRANSFORMER / TRANSFORMING) -- add
+# SNOWFLAKE_ROLE / SNOWFLAKE_WAREHOUSE secrets and wire them in below if
+# those defaults are wrong for this account. Schema assumes dbt's own
+# default ('jaffle_shop', profiles.yml) for where qlik_metric_definitions
+# lands -- change the FROM clause in "Export mirrored metrics for Qlik" if a
+# SNOWFLAKE_SCHEMA secret overrides that.
+#
+# NOT YET RUN AGAINST A REAL TENANT. Trigger it once by hand
+# (Actions tab -> this workflow -> Run workflow) and watch it fail honestly
+# before relying on it in a live demo. The riskiest unverified pieces: the
+# snowflakedb/snowflake-actions@v3 env var names for key-pair auth
+# (SNOWFLAKE_AUTHENTICATOR=SNOWFLAKE_JWT, SNOWFLAKE_PRIVATE_KEY_RAW, per
+# Snowflake's own CI/CD docs, not exercised here), and that the account's
+# default role can create a schema and a semantic view with no explicit
+# --role.
+
+name: semantic-layer-deploy
+
+on:
+  push:
+    branches: [main]
+    paths: ["models/**", "macros/**", "bridge/**", "dbt_project.yml"]
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+      SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+      SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+
+      - name: Install dbt v2 (Fusion)
+        run: |
+          curl -fsSL https://public.cdn.getdbt.com/fs/install/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Write Snowflake private key for dbt (profiles.yml wants a file path)
+        run: echo "$SNOWFLAKE_PRIVATE_KEY" > "$RUNNER_TEMP/snowflake_key.p8"
+        env:
+          SNOWFLAKE_PRIVATE_KEY: ${{ secrets.SNOWFLAKE_PRIVATE_KEY }}
+
+      - name: Build
+        run: dbt build --target snowflake
+        env:
+          SNOWFLAKE_PRIVATE_KEY_PATH: ${{ runner.temp }}/snowflake_key.p8
+
+      - name: Parse (so Ossie sources point at Snowflake tables)
+        run: dbt parse --target snowflake
+        env:
+          SNOWFLAKE_PRIVATE_KEY_PATH: ${{ runner.temp }}/snowflake_key.p8
+
+      - name: Portability check
+        run: python3 bridge/semantic_bridge.py --check
+
+      - name: Build the deploy SQL
+        run: uv run bridge/semantic_bridge.py
+
+      - uses: snowflakedb/snowflake-actions@v3
+
+      - name: Deploy the semantic view
+        run: snow sql -x -f target/deploy_semantic_views.sql
+        env:
+          SNOWFLAKE_AUTHENTICATOR: SNOWFLAKE_JWT
+          SNOWFLAKE_PRIVATE_KEY_RAW: ${{ secrets.SNOWFLAKE_PRIVATE_KEY }}
+
+      - name: Serve it over MCP
+        run: dbt run-operation deploy_mcp_server --target snowflake
+        env:
+          SNOWFLAKE_PRIVATE_KEY_PATH: ${{ runner.temp }}/snowflake_key.p8
+
+      - name: Reconcile against plain SQL
+        run: >
+          dbt test --target snowflake --select tag:reconciliation
+          --vars '{semantic_views_deployed: true}'
+        env:
+          SNOWFLAKE_PRIVATE_KEY_PATH: ${{ runner.temp }}/snowflake_key.p8
+
+      - name: Export mirrored metrics for Qlik
+        run: |
+          snow sql -x --format json -q "
+            SELECT metric_name AS \"metric_name\", label AS \"label\",
+                   description AS \"description\", qlik_expression AS \"qlik_expression\",
+                   sync_status AS \"sync_status\", sync_note AS \"sync_note\"
+            FROM ${SNOWFLAKE_DATABASE}.jaffle_shop.qlik_metric_definitions
+          " > target/qlik_metric_definitions.json
+        env:
+          SNOWFLAKE_AUTHENTICATOR: SNOWFLAKE_JWT
+          SNOWFLAKE_PRIVATE_KEY_RAW: ${{ secrets.SNOWFLAKE_PRIVATE_KEY }}
+
+      - name: Push master measures to Qlik
+        run: uv run bridge/qlik/sync.py --definitions target/qlik_metric_definitions.json
+        env:
+          QLIK_TENANT_URL: ${{ secrets.QLIK_TENANT_URL }}
+          QLIK_API_KEY: ${{ secrets.QLIK_API_KEY }}
+          QLIK_APP_ID: ${{ secrets.QLIK_APP_ID }}
