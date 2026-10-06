@@ -14,10 +14,6 @@ models:
     +materialized: table
 
 vars:
-  # Flip to true once the semantic view is deployed to Snowflake, so the
-  # reconciliation test runs: dbt build --target snowflake --vars '{semantic_views_deployed: true}'
-  semantic_views_deployed: false
-
   # Names that change per environment. The semantic view lives in
   # <target database>.<semantic_schema>.<semantic_view>. See MIGRATION.md.
   semantic_schema: semantic

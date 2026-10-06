@@ -30,6 +30,11 @@ models:
           name: order
       - name: customer_id
         description: The customer who placed the order.
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('customers')
+                field: customer_id
         entity:
           type: foreign
           name: customer
@@ -41,6 +46,10 @@ models:
           label: Order date
       - name: status
         description: completed or returned.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [completed, returned]
         dimension:
           type: categorical
           label: Order status
@@ -93,6 +102,10 @@ models:
           name: customer
       - name: region
         description: Sales region the customer belongs to.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [North, South, East]
         dimension:
           type: categorical
           label: Region

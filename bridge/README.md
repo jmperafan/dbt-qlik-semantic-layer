@@ -1,14 +1,15 @@
 # bridge
 
 Everything that carries the governed metric definitions out to Snowflake and
-Qlik, grouped here because both are plain scripts outside dbt's own
-conventions -- unlike the macros and models under `macros/`/`models/qlik/`,
-which dbt requires to live there (see [qlik/README.md](qlik/README.md)).
+Qlik, grouped here as plain Python scripts outside dbt's own layout, each
+unit tested in [tests/](tests/).
 
 | Where | What it is |
 |-------|------------|
 | [semantic_bridge.py](semantic_bridge.py) | MetricFlow YAML -> Apache Ossie -> Snowflake semantic view. Run with `uv run bridge/semantic_bridge.py --check` (portability only) or `--schema DATABASE.SCHEMA` (full run). See its module docstring for the full pipeline |
 | [ossie-0.1.1-schema.json](ossie-0.1.1-schema.json) | The official Ossie 0.1.1 JSON schema (Apache-2.0), vendored so `semantic_bridge.py` can validate against it offline |
+| [snowflake_admin.py](snowflake_admin.py) | `qlik-table` (the metric-to-Qlik-expression translation and the `qlik_metric_definitions` table) and `mcp-server` (the Snowflake-managed MCP server and its grants) |
+| [snowflake_connection.py](snowflake_connection.py) | The one shared "connect to Snowflake outside of dbt" helper, used by `snowflake_admin.py` and `tests/test_reconcile_semantic_view.py` |
 | [qlik/](qlik/) | The Qlik-facing half of the bridge: the load script and the optional master-item push automation. See [qlik/README.md](qlik/README.md) |
 | [tests/](tests/) | Unit tests for `semantic_bridge.py` and `qlik/sync.py` -- no network, no credentials needed, runs in CI |
 

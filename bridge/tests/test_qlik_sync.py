@@ -122,9 +122,10 @@ def test_engine_session_call_skips_messages_with_a_mismatched_id():
 
 # ---------------------------------------------------------------------------
 # upsert_measure -- a fake session recording calls, not a real connection.
-# Left exactly as written: the GetObject-based existence check was flagged
-# as an open question (GetObject vs the more measure-specific GetMeasure),
-# not a confirmed bug, in the review that preceded this test suite.
+# Uses GetMeasure, not GetObject: confirmed live against a real tenant that
+# GetObject never resolves a master measure by qId (null handle even right
+# after creating that object in the same session), which made every rerun
+# silently create a duplicate instead of updating in place.
 # ---------------------------------------------------------------------------
 
 
@@ -140,19 +141,19 @@ class FakeSession:
 
 def test_upsert_measure_updates_when_the_object_already_exists():
     session = FakeSession({
-        "GetObject": {"qReturn": {"qHandle": 42}},
+        "GetMeasure": {"qReturn": {"qHandle": 42}},
         "SetProperties": {},
     })
     metric = {"metric_name": "revenue", "qlik_expression": "Sum(amount)"}
     action = asyncio.run(qlik_sync.upsert_measure(session, doc_handle=1, metric=metric))
     assert action == "updated"
-    assert session.calls[0] == (1, "GetObject", ["m_revenue"])
+    assert session.calls[0] == (1, "GetMeasure", ["m_revenue"])
     assert session.calls[1][0] == 42 and session.calls[1][1] == "SetProperties"
 
 
 def test_upsert_measure_creates_when_the_object_does_not_exist():
     session = FakeSession({
-        "GetObject": {"qReturn": {}},
+        "GetMeasure": {"qReturn": {}},
         "CreateMeasure": {"qReturn": {"qHandle": 7}},
     })
     metric = {"metric_name": "revenue", "qlik_expression": "Sum(amount)"}
@@ -163,7 +164,7 @@ def test_upsert_measure_creates_when_the_object_does_not_exist():
 
 def test_upsert_measure_raises_when_create_measure_returns_no_handle():
     session = FakeSession({
-        "GetObject": {"qReturn": {}},
+        "GetMeasure": {"qReturn": {}},
         "CreateMeasure": {"qReturn": {}},
     })
     metric = {"metric_name": "revenue", "qlik_expression": "Sum(amount)"}

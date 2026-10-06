@@ -21,14 +21,20 @@ Engine API payload and prints it, no network. Neither needs Qlik credentials.
 Only the final form opens a connection: it needs QLIK_TENANT_URL (a bare
 host, like mytenant.us.qlikcloud.com), QLIK_API_KEY and QLIK_APP_ID.
 
-What's confirmed against current Qlik docs (see README.md): the
-WebSocket URL shape, the Bearer-token auth header, the OpenDoc handshake, and
-the CreateMeasure/SetProperties property tree. What's NOT run yet, because
-there's no live tenant to run it against: the actual round trip. Test this
-against a real app before trusting it in CI -- start with one metric.
+Confirmed live against a real Qlik Cloud tenant: WebSocket URL shape,
+Bearer-token auth, OpenDoc, CreateMeasure/SetProperties, and DoSave. That run
+also caught a real bug, now fixed: the existence check used GetObject, which
+never resolves a master measure by qId (confirmed: still a null handle
+immediately after creating that exact object in the same session) --
+GetMeasure is the call that actually works. Every rerun under the old code
+silently created a duplicate measure instead of updating one in place,
+because CreateMeasure doesn't error on a colliding qId, it just mints a new
+random id. If you ran this before the GetMeasure fix, check your app for
+duplicate measures (same label, random qId) and delete them.
 
 Unit tests: tests/python/test_qlik_sync.py covers everything except the real
-network round trip (sync_to_qlik), same gap as above.
+network round trip (sync_to_qlik) -- that part only gets exercised by running
+it against a real app, as above.
 """
 from __future__ import annotations
 
@@ -101,14 +107,18 @@ class EngineSession:
 
 
 async def upsert_measure(session: EngineSession, doc_handle: int, metric: dict) -> str:
-    """Update the measure if it exists, create it if it doesn't. GetObject
-    returns a handle for an existing qId; Qlik's own docs don't document a
-    clean 'does this exist' call beyond trying to fetch it, so this is the
-    documented way to check."""
+    """Update the measure if it exists, create it if it doesn't. Confirmed
+    live against a real tenant: GetObject never resolves a master measure by
+    qId (returns a null handle even immediately after creating that exact
+    object in the same session) -- GetMeasure is the qId-based lookup Doc
+    actually supports for library measures. Getting this wrong is silent:
+    CreateMeasure doesn't error on a duplicate qId, it mints a new object
+    with a random id instead, so the old GetObject version piled up a
+    duplicate measure on every single rerun instead of updating in place."""
     tree = measure_property_tree(metric)
     qid = tree["qInfo"]["qId"]
 
-    existing = await session.call(doc_handle, "GetObject", [qid])
+    existing = await session.call(doc_handle, "GetMeasure", [qid])
     handle = existing.get("qReturn", {}).get("qHandle")
 
     if handle:
@@ -125,14 +135,24 @@ async def sync_to_qlik(tenant_url: str, api_key: str, app_id: str, metrics: list
 
     url = f"wss://{tenant_url}/app/{app_id}"
     headers = {"Authorization": f"Bearer {api_key}"}
-    async with websockets.connect(url, additional_headers=headers) as ws:
-        session = EngineSession(ws)
-        opened = await session.call(-1, "OpenDoc", [app_id])
-        doc_handle = opened["qReturn"]["qHandle"]
+    try:
+        async with websockets.connect(url, additional_headers=headers) as ws:
+            session = EngineSession(ws)
+            opened = await session.call(-1, "OpenDoc", [app_id])
+            doc_handle = opened["qReturn"]["qHandle"]
 
-        for metric in metrics:
-            action = await upsert_measure(session, doc_handle, metric)
-            print(f"{action}: {metric['metric_name']}")
+            for metric in metrics:
+                action = await upsert_measure(session, doc_handle, metric)
+                print(f"{action}: {metric['metric_name']}")
+
+            # CreateMeasure/SetProperties only mutate the in-memory engine
+            # session. Without DoSave, every change here is discarded the
+            # moment this websocket closes -- confirmed live: a second run
+            # with no DoSave reported "created" for every metric every time,
+            # never "updated".
+            await session.call(doc_handle, "DoSave", [])
+    except websockets.exceptions.ConnectionClosed as error:
+        raise BridgeError(f"connection to Qlik closed unexpectedly: {error}") from error
 
 
 def main() -> None:

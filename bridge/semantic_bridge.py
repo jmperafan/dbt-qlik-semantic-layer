@@ -354,7 +354,7 @@ def project_defaults(manifest: dict) -> tuple[str | None, str | None]:
     """Default --schema/--model-name from dbt_project.yml's semantic_schema/
     semantic_view vars, combined with the database dbt actually resolved
     (any node's database field in manifest.json) -- so the bridge and
-    deploy_mcp_server agree on where the semantic view lives without a human
+    snowflake_admin.py's mcp-server agree on where the semantic view lives without a human
     typing the same address twice in --schema and in dbt_project.yml. Either
     half missing (no vars block, or a manifest with no nodes) means no
     default; an explicit --schema/--model-name still works either way."""

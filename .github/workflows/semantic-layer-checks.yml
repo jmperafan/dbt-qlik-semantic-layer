@@ -3,8 +3,11 @@
 # No warehouse needed. dbt parse doesn't connect, and the bridge only reads
 # target/. Deploying to Snowflake stays a separate step with real credentials.
 #
-# `python-tests` unit-tests bridge/semantic_bridge.py and bridge/qlik/sync.py --
-# no dbt, no warehouse, no credentials at all.
+# `python-tests` unit-tests everything in bridge/ (semantic_bridge.py,
+# snowflake_admin.py, bridge/qlik/sync.py) -- no dbt, no warehouse, no
+# credentials at all. The one test that needs a live warehouse
+# (test_reconcile_semantic_view.py) skips itself unless RECONCILE_LIVE=true,
+# so it's a no-op here and only runs from semantic-layer-deploy.yml.
 #
 # `checks` parses with dbt v2 and takes the bridge's default `--source converter`
 # route (Apache converter on semantic_manifest.json, rewrapped to Ossie 0.1.1) --
@@ -17,7 +20,7 @@ name: semantic-layer-checks
 
 on:
   pull_request:
-    paths: ["models/**", "macros/**", "bridge/**", "dbt_project.yml"]
+    paths: ["models/**", "bridge/**", "dbt_project.yml"]
 
 jobs:
   python-tests:

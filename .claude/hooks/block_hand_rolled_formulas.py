@@ -10,9 +10,10 @@ miss creative rewrites and can false-positive on unrelated words. It's a nudge
 that costs a retry, not a proof.
 
 Reads a PreToolUse hook payload from stdin (tool_name, tool_input.file_path,
-tool_input.content for Write, tool_input.new_string for Edit). Exits 2 to
-block the write, with the reason on stderr, which Claude sees. Exits 0 to
-allow it.
+tool_input.content for Write, tool_input.new_string for Edit,
+tool_input.notebook_path/new_source for NotebookEdit -- a code cell is just
+as unreviewed a home for a formula as any other file). Exits 2 to block the
+write, with the reason on stderr, which Claude sees. Exits 0 to allow it.
 """
 from __future__ import annotations
 
@@ -34,18 +35,18 @@ def main() -> None:
     except json.JSONDecodeError:
         sys.exit(0)  # can't read the payload, don't block on a guess
 
-    if payload.get("tool_name") not in ("Write", "Edit"):
+    if payload.get("tool_name") not in ("Write", "Edit", "NotebookEdit"):
         sys.exit(0)
 
     tool_input = payload.get("tool_input") or {}
-    file_path = tool_input.get("file_path") or ""
+    file_path = tool_input.get("file_path") or tool_input.get("notebook_path") or ""
     if not file_path:
         sys.exit(0)
 
     if file_path.endswith((".yml", ".yaml")) or ALLOWED_PATH_PATTERN.search(file_path):
         sys.exit(0)  # the semantic layer and its translation macros are the allowed home
 
-    new_text = tool_input.get("content") or tool_input.get("new_string") or ""
+    new_text = tool_input.get("content") or tool_input.get("new_string") or tool_input.get("new_source") or ""
     match = AGGREGATION_PATTERN.search(new_text)
     if match:
         print(
