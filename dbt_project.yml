@@ -24,4 +24,3 @@ vars:
   semantic_view: jaffle_shop
   metrics_reader_role: metrics_reader
   mcp_warehouse: transforming
-# ci-trigger: temporary, to fire the path-filtered workflow for validation; reverted before merge
