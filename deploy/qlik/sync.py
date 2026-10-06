@@ -8,13 +8,13 @@ Push governed metric definitions to Qlik as master measures, over the
 Engine API (QIX), instead of wiring each one by hand in the Qlik UI.
 
 Input is a JSON export of the qlik_metric_definitions table -- the same
-table the load script (bridge/qlik/load_metric_definitions.qvs) reads today.
+table the load script (deploy/qlik/load_metric_definitions.qvs) reads today.
 This script doesn't query Snowflake itself; that stays a separate,
 already-built step (dbt build), so this script has exactly one job.
 
-  uv run bridge/qlik/sync.py --definitions target/qlik_metric_definitions.json --check
-  uv run bridge/qlik/sync.py --definitions target/qlik_metric_definitions.json --dry-run
-  uv run bridge/qlik/sync.py --definitions target/qlik_metric_definitions.json
+  uv run deploy/qlik/sync.py --definitions target/qlik_metric_definitions.json --check
+  uv run deploy/qlik/sync.py --definitions target/qlik_metric_definitions.json --dry-run
+  uv run deploy/qlik/sync.py --definitions target/qlik_metric_definitions.json
 
 --check validates the input file only, no network. --dry-run builds every
 Engine API payload and prints it, no network. Neither needs Qlik credentials.

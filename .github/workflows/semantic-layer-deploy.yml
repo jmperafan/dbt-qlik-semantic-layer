@@ -26,7 +26,7 @@ name: semantic-layer-deploy
 on:
   push:
     branches: [main]
-    paths: ["models/**", "bridge/**", "dbt_project.yml"]
+    paths: ["models/**", "deploy/**", "dbt_project.yml"]
   workflow_dispatch: {}
 
 jobs:
@@ -60,10 +60,10 @@ jobs:
         run: dbt parse --target snowflake
 
       - name: Portability check
-        run: python3 bridge/semantic_bridge.py --check
+        run: python3 deploy/semantic_bridge.py --check
 
       - name: Build the deploy SQL
-        run: uv run bridge/semantic_bridge.py
+        run: uv run deploy/semantic_bridge.py
 
       - uses: snowflakedb/snowflake-actions@v3
 
@@ -83,18 +83,18 @@ jobs:
         # someone with ACCOUNTADMIN/SECURITYADMIN runs the grants once, or
         # grants one of these roles MANAGE GRANTS.
         continue-on-error: true
-        run: uv run bridge/snowflake_admin.py mcp-server
+        run: uv run deploy/snowflake_admin.py mcp-server
 
       - name: Reconcile against plain SQL
-        run: uv run --with pytest --with snowflake-connector-python --with pyyaml pytest bridge/tests/test_reconcile_semantic_view.py -v
+        run: uv run --with pytest --with snowflake-connector-python --with pyyaml pytest deploy/tests/test_reconcile_semantic_view.py -v
         env:
           RECONCILE_LIVE: "true"
 
       - name: Build the Qlik metric-definitions table, and export it for sync.py
-        run: uv run bridge/snowflake_admin.py qlik-table --write-json target/qlik_metric_definitions.json
+        run: uv run deploy/snowflake_admin.py qlik-table --write-json target/qlik_metric_definitions.json
 
       - name: Push master measures to Qlik
-        run: uv run bridge/qlik/sync.py --definitions target/qlik_metric_definitions.json
+        run: uv run deploy/qlik/sync.py --definitions target/qlik_metric_definitions.json
         env:
           QLIK_TENANT_URL: ${{ secrets.QLIK_TENANT_URL }}
           QLIK_API_KEY: ${{ secrets.QLIK_API_KEY }}

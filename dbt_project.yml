@@ -15,7 +15,8 @@ models:
 
 vars:
   # Names that change per environment. The semantic view lives in
-  # <target database>.<semantic_schema>.<semantic_view>. See MIGRATION.md.
+  # <target database>.<semantic_schema>.<semantic_view>. See README.md's
+  # "Adapting this to your own project" section.
   semantic_schema: semantic
   semantic_view: jaffle_shop
   metrics_reader_role: metrics_reader

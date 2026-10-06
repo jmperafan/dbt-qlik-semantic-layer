@@ -5,11 +5,11 @@ must not reuse the semantic layer's logic, or it can't catch a translation
 bug.
 
 Needs a live, already-deployed semantic view, so unlike the rest of
-bridge/tests it isn't run by default: skipped unless SNOWFLAKE_ACCOUNT and
+deploy/tests it isn't run by default: skipped unless SNOWFLAKE_ACCOUNT and
 RECONCILE_LIVE=true are both set.
 
   RECONCILE_LIVE=true uv run --with pytest --with snowflake-connector-python \\
-      --with pyyaml pytest bridge/tests/test_reconcile_semantic_view.py -v
+      --with pyyaml pytest deploy/tests/test_reconcile_semantic_view.py -v
 """
 from __future__ import annotations
 

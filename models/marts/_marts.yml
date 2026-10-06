@@ -4,7 +4,7 @@
 #   semantic_model / entity / dimension / metrics  ->  MetricFlow (dbt SL, dbt MCP)
 #   config.meta.snowflake                          ->  Cortex-only extras, merged
 #                                                      into the Ossie document by
-#                                                      bridge/semantic_bridge.py
+#                                                      deploy/semantic_bridge.py
 #
 # The meta block never holds a formula. If it did, we'd have two definitions.
 # ──────────────────────────────────────────────────────────────────────────────

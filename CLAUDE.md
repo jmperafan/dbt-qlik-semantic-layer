@@ -24,9 +24,9 @@ version:
 1. Edit the YAML. `config.meta.snowflake` holds Cortex synonyms and
    instructions only, never a formula. A `PostToolUse` hook re-runs the
    portability check on save
-2. `dbt parse --target snowflake && uv run bridge/semantic_bridge.py --check`.
+2. `dbt parse --target snowflake && uv run deploy/semantic_bridge.py --check`.
    If it fails, fix the metric or mark it `config.meta.dbt_only: true`.
-   Optionally, `uv run bridge/snowflake_admin.py qlik-table --check` shows
+   Optionally, `uv run deploy/snowflake_admin.py qlik-table --check` shows
    how the metric will mirror to Qlik, with no Snowflake connection
 3. Open the PR. `semantic-layer-checks.yml` re-runs the same checks
 4. Merge. `semantic-layer-deploy.yml` builds, deploys the semantic view,

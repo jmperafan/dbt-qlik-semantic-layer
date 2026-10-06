@@ -7,15 +7,15 @@ Two things that used to be dbt Jinja macros (macros/metrics/qlik.sql,
 macros/metrics/snowflake_mcp.sql) -- moved here, as plain Python, because a
 Jinja macro can't be unit tested without a running dbt project and these
 were the only two pieces of logic in this repo with no test coverage.
-Everything in bridge/ already has it.
+Everything in deploy/ already has it.
 
   1. qlik-table   Translate every metric in target/semantic_manifest.json
                    into a Qlik expression (same two shapes as before: a
                    bare-column aggregation, or a ratio of two mirrored
                    metrics), write the result as a Snowflake table
                    (qlik_metric_definitions -- the table
-                   bridge/qlik/load_metric_definitions.qvs reads), and
-                   optionally the same rows as JSON for bridge/qlik/sync.py,
+                   deploy/qlik/load_metric_definitions.qvs reads), and
+                   optionally the same rows as JSON for deploy/qlik/sync.py,
                    so there's no separate "export it back out of Snowflake"
                    step in between.
 
@@ -23,13 +23,13 @@ Everything in bridge/ already has it.
                    semantic view and its grants (former deploy_mcp_server).
 
 Each subcommand's --check or --dry-run runs with no Snowflake connection, the
-same split semantic_bridge.py and bridge/qlik/sync.py already use.
+same split semantic_bridge.py and deploy/qlik/sync.py already use.
 
-  uv run bridge/snowflake_admin.py qlik-table --check
-  uv run bridge/snowflake_admin.py qlik-table --dry-run
-  uv run bridge/snowflake_admin.py qlik-table --write-json target/qlik_metric_definitions.json
-  uv run bridge/snowflake_admin.py mcp-server --dry-run
-  uv run bridge/snowflake_admin.py mcp-server --oauth-integration
+  uv run deploy/snowflake_admin.py qlik-table --check
+  uv run deploy/snowflake_admin.py qlik-table --dry-run
+  uv run deploy/snowflake_admin.py qlik-table --write-json target/qlik_metric_definitions.json
+  uv run deploy/snowflake_admin.py mcp-server --dry-run
+  uv run deploy/snowflake_admin.py mcp-server --oauth-integration
 """
 from __future__ import annotations
 
@@ -292,7 +292,7 @@ def main() -> None:
     qlik_table = sub.add_parser("qlik-table", help="Build and deploy the Qlik metric-definitions table")
     qlik_table.add_argument("--target-dir", type=Path, default=Path("target"))
     qlik_table.add_argument("--schema", help="DATABASE.SCHEMA (default: SNOWFLAKE_DATABASE + SNOWFLAKE_SCHEMA/'jaffle_shop')")
-    qlik_table.add_argument("--write-json", type=Path, help="Also write the rows as JSON, for bridge/qlik/sync.py")
+    qlik_table.add_argument("--write-json", type=Path, help="Also write the rows as JSON, for deploy/qlik/sync.py")
     qlik_table.add_argument("--check", action="store_true", help="Build the rows only, no Snowflake connection")
     qlik_table.add_argument("--dry-run", action="store_true", help="Print the rows, no Snowflake connection")
     qlik_table.set_defaults(handler=run_qlik_table)
