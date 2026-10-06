@@ -55,8 +55,8 @@ behind it.
 | [deploy/snowflake_connection.py](deploy/snowflake_connection.py) | The one shared "connect to Snowflake outside of dbt" helper, used by `snowflake_admin.py` and the reconciliation test |
 | [deploy/qlik/load_metric_definitions.qvs](deploy/qlik/load_metric_definitions.qvs), [deploy/qlik/sync.py](deploy/qlik/sync.py) | Qlik load script that turns each mirrored row into a variable, and the optional automation that pushes master measures over the Engine API. See ["Qlik"](#qlik) below |
 | [deploy/tests/](deploy/tests/) | Unit tests for everything in `deploy/` -- no network, no credentials needed, runs in CI. `test_reconcile_semantic_view.py` is the one exception: it needs a live, deployed semantic view, so it skips itself unless `RECONCILE_LIVE=true` |
-| [.github/workflows/semantic-layer-checks.yml](.github/workflows/semantic-layer-checks.yml) | Runs the portability check and the Snowflake readiness check on every pull request, with no warehouse: on dbt v2 as the primary check, dbt v1.12 as an optional cross-check |
-| [.github/workflows/semantic-layer-deploy.yml](.github/workflows/semantic-layer-deploy.yml) | Runs the full deploy sequence on every merge to main -- see ["Deploy to Snowflake"](#deploy-to-snowflake) |
+| [.github/workflows/dbt-sl-ci.yml](.github/workflows/dbt-sl-ci.yml) | Runs the portability check and the Snowflake readiness check on every pull request, with no warehouse: on dbt v2 as the primary check, dbt v1.12 as an optional cross-check |
+| [.github/workflows/dbt-sl-cd.yml](.github/workflows/dbt-sl-cd.yml) | Runs the full deploy sequence on every merge to main -- see ["Deploy to Snowflake"](#deploy-to-snowflake) |
 | [CLAUDE.md](CLAUDE.md), [.claude/desktop_project_instructions.md](.claude/desktop_project_instructions.md), [.claude/skills/governed-metrics/](.claude/skills/governed-metrics/) | The soft guardrail: use governed metrics, never improvise a formula. Packaged as a skill, not just prose, so it's more reliably triggered |
 | [.claude/hooks/](.claude/hooks/), [.claude/settings.json](.claude/settings.json) | The hard guardrail: a `PreToolUse` hook blocks an obvious hand-rolled formula written to a file; a `PostToolUse` hook re-runs the portability check the moment the YAML changes. Neither catches a wrong answer spoken in chat, only one written to disk |
 | [.mcp.json](.mcp.json), [.env.example](.env.example) | Project-scoped MCP servers for Claude Code, with a `.env` for Path B or Path A. No credentials committed |
@@ -116,7 +116,7 @@ either route without edits.
 
 ## Deploy to Snowflake
 
-[.github/workflows/semantic-layer-deploy.yml](.github/workflows/semantic-layer-deploy.yml)
+[.github/workflows/dbt-sl-cd.yml](.github/workflows/dbt-sl-cd.yml)
 runs this whole sequence on every merge to main -- edit the YAML, open a PR,
 merge, and the rest happens without anyone running these by hand. Confirmed
 live against a real warehouse and a real Qlik tenant (2026-10-06): `dbt
@@ -143,7 +143,7 @@ uv run deploy/qlik/sync.py --definitions target/qlik_metric_definitions.json
 ownership -- set `SNOWFLAKE_ROLE` if the account's default build role can't
 grant to `metrics_reader_role`.
 
-In CI, [.github/workflows/semantic-layer-checks.yml](.github/workflows/semantic-layer-checks.yml)
+In CI, [.github/workflows/dbt-sl-ci.yml](.github/workflows/dbt-sl-ci.yml)
 runs the portability check and the Snowflake readiness check on every pull request without
 touching the warehouse: the `checks` job on dbt v2, an optional
 `cross-check` job on dbt v1.12. The reconciliation test and the Qlik push only run
@@ -330,8 +330,8 @@ running on the platform.
    using `$(m_average_order_value)`. Wire each master measure to its variable
    by hand once, or push them with `uv run deploy/qlik/sync.py --definitions
    <export>.json` once you have a Qlik Cloud tenant and API key
-7. **CI.** Add `semantic-layer-checks.yml`, and open a pull request that
-   breaks a metric on purpose to see it fail. Add `semantic-layer-deploy.yml`
+7. **CI.** Add `dbt-sl-ci.yml`, and open a pull request that
+   breaks a metric on purpose to see it fail. Add `dbt-sl-cd.yml`
    for the merge-to-main side
 8. **Claude.** Merge `CLAUDE.md`, add the Desktop connector and paste the
    project instructions

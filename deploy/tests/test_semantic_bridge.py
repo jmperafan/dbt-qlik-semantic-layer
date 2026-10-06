@@ -2,7 +2,7 @@
 
 Covers everything in that file except from_converter (needs the pinned git
 dependency apache-ossie-dbt -- already exercised for real by the `checks` job
-in .github/workflows/semantic-layer-checks.yml). Nothing here needs network
+in .github/workflows/dbt-sl-ci.yml). Nothing here needs network
 access or real Snowflake/dbt credentials.
 """
 from __future__ import annotations

@@ -1,6 +1,6 @@
 # Not used by the dbt platform -- it manages its own connection in its own
 # UI, and never reads this file. This exists purely for CI (the parse-only
-# checks in .github/workflows/semantic-layer-checks.yml need some profile to
+# checks in .github/workflows/dbt-sl-ci.yml need some profile to
 # resolve the "snowflake" target) and for anyone running dbt-core locally
 # instead of on the platform. Snowflake only. Credentials come from the
 # environment, never from here.

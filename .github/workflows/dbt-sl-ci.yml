@@ -7,7 +7,7 @@
 # snowflake_admin.py, deploy/qlik/sync.py) -- no dbt, no warehouse, no
 # credentials at all. The one test that needs a live warehouse
 # (test_reconcile_semantic_view.py) skips itself unless RECONCILE_LIVE=true,
-# so it's a no-op here and only runs from semantic-layer-deploy.yml.
+# so it's a no-op here and only runs from dbt-sl-cd.yml.
 #
 # `checks` parses with dbt v2 and takes the bridge's default `--source converter`
 # route (Apache converter on semantic_manifest.json, rewrapped to Ossie 0.1.1) --
@@ -16,7 +16,7 @@
 # purely to confirm the two independently-built converters agree. It's optional --
 # drop it if you don't need the extra confirmation, or if it gets noisy.
 
-name: semantic-layer-checks
+name: dbt-sl-ci
 
 on:
   pull_request:

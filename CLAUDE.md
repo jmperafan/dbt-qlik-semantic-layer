@@ -28,8 +28,8 @@ version:
    If it fails, fix the metric or mark it `config.meta.dbt_only: true`.
    Optionally, `uv run deploy/snowflake_admin.py qlik-table --check` shows
    how the metric will mirror to Qlik, with no Snowflake connection
-3. Open the PR. `semantic-layer-checks.yml` re-runs the same checks
-4. Merge. `semantic-layer-deploy.yml` builds, deploys the semantic view,
+3. Open the PR. `dbt-sl-ci.yml` re-runs the same checks
+4. Merge. `dbt-sl-cd.yml` builds, deploys the semantic view,
    serves it over MCP, reconciles, and pushes mirrored metrics to Qlik --
    nothing else by hand. See [README.md](README.md#deploy-to-snowflake) for
    the commands if you need to run any of that yourself
