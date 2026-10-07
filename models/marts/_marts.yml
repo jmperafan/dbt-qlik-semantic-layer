@@ -90,7 +90,6 @@ models:
         type: simple
         agg: average
         expr: amount
-     
 
 
   - name: customers
