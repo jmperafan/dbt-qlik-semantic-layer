@@ -1,0 +1,17 @@
+# Metrics built from other metrics. Simple metrics sit on the model they
+# aggregate, in models/marts/_marts.yml.
+
+metrics:
+  - name: average_order_value
+    label: Average order value
+    description: Revenue divided by the number of orders.
+    type: ratio
+    numerator: revenue
+    denominator: order_count
+
+  - name: revenue_mtd
+    label: Revenue, month to date
+    description: Running revenue, resetting at the start of each month.
+    type: cumulative
+    input_metric: revenue
+    grain_to_date: month
